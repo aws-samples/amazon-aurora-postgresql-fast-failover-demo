@@ -1,0 +1,1199 @@
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Database
+        Parameters:
+          - DBAdminUsername
+          - DBAdminPassword
+      - Label:
+          default: Primary Region
+        Parameters:
+          - PrimaryRegionName
+          - PrimaryVPCID
+          - PrimaryPublicSubnetIDs
+          - PrimaryPrivateSubnetIDs
+          - PrimaryDatabaseSecurityGroupID
+          - PrimaryKMSKeyID
+      - Label:
+          default: Failover Region
+        Parameters:
+          - FailoverRegionName
+          - FailoverVPCID
+          - FailoverPublicSubnetIDs
+          - FailoverPrivateSubnetIDs
+          - FailoverDatabaseSecurityGroupID
+          - FailoverKMSKeyID
+      - Label:
+          default: Accessibility
+        Parameters:
+          - ServiceFQDN
+          - ServiceFQDNZoneID
+    ParameterLabels:
+      DBAdminPassword:
+        default: Admin Password
+      DBAdminUsername:
+        default: Admin Username
+      FailoverDatabaseSecurityGroupID:
+        default: Database Security Group ID
+      FailoverKMSKeyID:
+        default: KMS Key ARN
+      FailoverPrivateSubnetIDs:
+        default: Private Subnet IDs
+      FailoverPublicSubnetIDs:
+        default: Public Subnet IDs
+      FailoverRegionName:
+        default: Region Name
+      FailoverVPCID:
+        default: VPC ID
+      PrimaryDatabaseSecurityGroupID:
+        default: Database Security Group ID
+      PrimaryKMSKeyID:
+        default: KMS Key ARN
+      PrimaryPrivateSubnetIDs:
+        default: Private Subnet IDs
+      PrimaryPublicSubnetIDs:
+        default: Public Subnet IDs
+      PrimaryRegionName:
+        default: Region Name
+      PrimaryVPCID:
+        default: VPC ID
+      ServiceFQDN:
+        default: Service FQDN
+      ServiceFQDNZoneID:
+        default: Hosted Zone ID
+  Comments: ''
+  CreatedBy: Carter Meyers (AWS)
+  Description: ''
+  LastUpdated: August 27, 2022
+  Version: v1.0
+Parameters:
+  DBAdminPassword:
+    Description: The password to be used for the RDS Aurora admin account.
+    NoEcho: true
+    Type: String
+  DBAdminUsername:
+    Description: The username to be used for the RDS Aurora admin account.
+    Type: String
+  FailoverDatabaseSecurityGroupID:
+    Description: The security group to be used by the RDS Aurora Cluster.
+    Type: String
+  FailoverKMSKeyID:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  FailoverPrivateSubnetIDs:
+    Description: A comma-delimited list of subnets to be used for non-public resources
+      (e.g., RDS database, Lambda functions).
+    Type: String
+  FailoverPublicSubnetIDs:
+    Description: A comma-delimited list of subnets to be used for publicly-accessible
+      resources (e.g., ALBs).
+    Type: String
+  FailoverRegionName:
+    Description: The name of the failover region (e.g., us-east-1)
+    Type: String
+  FailoverVPCID:
+    Description: The VPC into which network resources should be launched.
+    Type: String
+  PrimaryDatabaseSecurityGroupID:
+    Description: The security group to be used by the RDS Aurora Cluster.
+    Type: String
+  PrimaryKMSKeyID:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  PrimaryPrivateSubnetIDs:
+    Description: A comma-delimited list of subnets to be used for non-public resources
+      (e.g., RDS database, Lambda functions).
+    Type: String
+  PrimaryPublicSubnetIDs:
+    Description: A comma-delimited list of subnets to be used for publicly-accessible
+      resources (e.g., ALBs).
+    Type: String
+  PrimaryRegionName:
+    Description: The name of the primary region (e.g., us-east-1)
+    Type: String
+  PrimaryVPCID:
+    Description: The VPC into which network resources should be launched.
+    Type: String
+  ServiceFQDN:
+    Description: The FQDN to be used for this application. This FQDN will point to
+      the deployed ALBs.
+    Type: String
+  ServiceFQDNZoneID:
+    Description: The ID of the Route 53 hosted zone corresponding to the Service FQDN.
+    Type: String
+Resources:
+  ARCCluster:
+    Properties:
+      Name: !Ref 'AWS::StackName'
+    Type: AWS::Route53RecoveryControl::Cluster
+  ARCControlPanel:
+    DependsOn:
+      - ARCCluster
+    Properties:
+      ClusterArn: !GetAtt 'ARCCluster.ClusterArn'
+      Name: !Ref 'AWS::StackName'
+    Type: AWS::Route53RecoveryControl::ControlPanel
+  ARCRoutingControl:
+    DependsOn:
+      - ARCCluster
+      - ARCControlPanel
+    Properties:
+      ClusterArn: !Ref 'ARCCluster'
+      ControlPanelArn: !GetAtt 'ARCControlPanel.ControlPanelArn'
+      Name: !Ref 'AWS::StackName'
+    Type: AWS::Route53RecoveryControl::RoutingControl
+  StackSet:
+    DependsOn:
+      - StackSetExecutionRole
+      - StackSetAdministrationRole
+    Properties:
+      AdministrationRoleARN: !GetAtt 'StackSetAdministrationRole.Arn'
+      CallAs: SELF
+      Capabilities:
+        - CAPABILITY_IAM
+        - CAPABILITY_AUTO_EXPAND
+      Description: Multi-Region RDS Aurora Deployment
+      ExecutionRoleName: !Ref 'StackSetExecutionRole'
+      OperationPreferences:
+        FailureToleranceCount: 0
+        MaxConcurrentCount: 1
+        RegionConcurrencyType: SEQUENTIAL
+        RegionOrder:
+          - !Ref 'PrimaryRegionName'
+          - !Ref 'FailoverRegionName'
+      Parameters:
+        - ParameterKey: StackSetName
+          ParameterValue: !Ref 'AWS::StackName'
+        - ParameterKey: DBAdminUsername
+          ParameterValue: !Ref 'DBAdminUsername'
+        - ParameterKey: DBAdminPassword
+          ParameterValue: !Ref 'DBAdminPassword'
+        - ParameterKey: ServiceFQDN
+          ParameterValue: !Ref 'ServiceFQDN'
+        - ParameterKey: ServiceFQDNZoneID
+          ParameterValue: !Ref 'ServiceFQDNZoneID'
+        - ParameterKey: PrimaryRegionName
+          ParameterValue: !Ref 'PrimaryRegionName'
+        - ParameterKey: PrimaryKMSKeyID
+          ParameterValue: !Ref 'PrimaryKMSKeyID'
+        - ParameterKey: PrimaryVPCID
+          ParameterValue: !Ref 'PrimaryVPCID'
+        - ParameterKey: PrimaryPublicSubnetIDs
+          ParameterValue: !Ref 'PrimaryPublicSubnetIDs'
+        - ParameterKey: PrimaryPrivateSubnetIDs
+          ParameterValue: !Ref 'PrimaryPrivateSubnetIDs'
+        - ParameterKey: PrimaryDatabaseSecurityGroupID
+          ParameterValue: !Ref 'PrimaryDatabaseSecurityGroupID'
+        - ParameterKey: FailoverRegionName
+          ParameterValue: !Ref 'FailoverRegionName'
+        - ParameterKey: FailoverKMSKeyID
+          ParameterValue: !Ref 'FailoverKMSKeyID'
+        - ParameterKey: FailoverVPCID
+          ParameterValue: !Ref 'FailoverVPCID'
+        - ParameterKey: FailoverPublicSubnetIDs
+          ParameterValue: !Ref 'FailoverPublicSubnetIDs'
+        - ParameterKey: FailoverPrivateSubnetIDs
+          ParameterValue: !Ref 'FailoverPrivateSubnetIDs'
+        - ParameterKey: FailoverDatabaseSecurityGroupID
+          ParameterValue: !Ref 'FailoverDatabaseSecurityGroupID'
+      PermissionModel: SELF_MANAGED
+      StackInstancesGroup:
+        - DeploymentTargets:
+            Accounts:
+              - !Ref 'AWS::AccountId'
+          Regions:
+            - !Ref 'PrimaryRegionName'
+            - !Ref 'FailoverRegionName'
+      StackSetName: !Ref 'AWS::StackName'
+      TemplateBody: |
+        Conditions:
+          IsFailoverRegion: !Not
+            - !Equals
+              - !Ref 'PrimaryRegionName'
+              - !Ref 'AWS::Region'
+          IsPrimaryRegion: !Equals
+            - !Ref 'PrimaryRegionName'
+            - !Ref 'AWS::Region'
+        Metadata:
+          AWS::CloudFormation::Interface:
+            ParameterGroups:
+              - Label:
+                  default: Database
+                Parameters:
+                  - DBAdminUsername
+                  - DBAdminPassword
+              - Label:
+                  default: Primary Region
+                Parameters:
+                  - PrimaryRegionName
+                  - PrimaryVPCID
+                  - PrimaryPublicSubnetIDs
+                  - PrimaryPrivateSubnetIDs
+                  - PrimaryDatabaseSecurityGroupID
+                  - PrimaryKMSKeyID
+              - Label:
+                  default: Failover Region
+                Parameters:
+                  - FailoverRegionName
+                  - FailoverVPCID
+                  - FailoverPublicSubnetIDs
+                  - FailoverPrivateSubnetIDs
+                  - FailoverDatabaseSecurityGroupID
+                  - FailoverKMSKeyID
+              - Label:
+                  default: Accessibility
+                Parameters:
+                  - ServiceFQDN
+                  - ServiceFQDNZoneID
+            ParameterLabels:
+              DBAdminPassword:
+                default: Admin Password
+              DBAdminUsername:
+                default: Admin Username
+              FailoverDatabaseSecurityGroupID:
+                default: Database Security Group ID
+              FailoverKMSKeyID:
+                default: KMS Key ARN
+              FailoverPrivateSubnetIDs:
+                default: Private Subnet IDs
+              FailoverPublicSubnetIDs:
+                default: Public Subnet IDs
+              FailoverRegionName:
+                default: Region Name
+              FailoverVPCID:
+                default: VPC ID
+              PrimaryDatabaseSecurityGroupID:
+                default: Database Security Group ID
+              PrimaryKMSKeyID:
+                default: KMS Key ARN
+              PrimaryPrivateSubnetIDs:
+                default: Private Subnet IDs
+              PrimaryPublicSubnetIDs:
+                default: Public Subnet IDs
+              PrimaryRegionName:
+                default: Region Name
+              PrimaryVPCID:
+                default: VPC ID
+              ServiceFQDN:
+                default: Service FQDN
+              ServiceFQDNZoneID:
+                default: Hosted Zone ID
+              StackSetName:
+                default: Stack Set Name
+          Comments: ''
+          CreatedBy: Carter Meyers (AWS)
+          Description: This application deploys a Global RDS Aurora cluster.
+          LastUpdated: August 27, 2022
+          Version: v1.0
+        Parameters:
+          DBAdminPassword:
+            Description: The password to be used for the RDS Aurora admin account.
+            NoEcho: true
+            Type: String
+          DBAdminUsername:
+            Description: The username to be used for the RDS Aurora admin account.
+            Type: String
+          FailoverDatabaseSecurityGroupID:
+            Description: The security group to be used by the RDS Aurora Cluster.
+            Type: String
+          FailoverKMSKeyID:
+            Description: >-
+              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+              Manager). This must correspond to a multi-region CMK available in both the primary
+              and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+            Type: String
+          FailoverPrivateSubnetIDs:
+            Description: A comma-delimited list of subnets to be used for non-public resources
+              (e.g., RDS database, Lambda functions).
+            Type: String
+          FailoverPublicSubnetIDs:
+            Description: A comma-delimited list of subnets to be used for publicly-accessible
+              resources (e.g., ALBs).
+            Type: String
+          FailoverRegionName:
+            Description: The name of the failover region (e.g., us-east-1)
+            Type: String
+          FailoverVPCID:
+            Description: The VPC into which network resources should be launched.
+            Type: String
+          PrimaryDatabaseSecurityGroupID:
+            Description: The security group to be used by the RDS Aurora Cluster.
+            Type: String
+          PrimaryKMSKeyID:
+            Description: >-
+              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+              Manager). This must correspond to a multi-region CMK available in both the primary
+              and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+            Type: String
+          PrimaryPrivateSubnetIDs:
+            Description: A comma-delimited list of subnets to be used for non-public resources
+              (e.g., RDS database, Lambda functions).
+            Type: String
+          PrimaryPublicSubnetIDs:
+            Description: A comma-delimited list of subnets to be used for publicly-accessible
+              resources (e.g., ALBs).
+            Type: String
+          PrimaryRegionName:
+            Description: The name of the primary region (e.g., us-east-1)
+            Type: String
+          PrimaryVPCID:
+            Description: The VPC into which network resources should be launched.
+            Type: String
+          ServiceFQDN:
+            Description: The FQDN to be used for this application. This FQDN will point to
+              the deployed ALBs.
+            Type: String
+          ServiceFQDNZoneID:
+            Description: The ID of the Route 53 hosted zone corresponding to the Service FQDN.
+            Type: String
+          StackSetName:
+            Default: sdfdsf
+            Description: The VPC in which resources should be launched.
+            Type: String
+        Resources:
+          ALB:
+            DependsOn:
+              - ALBSecurityGroup
+            Properties:
+              IpAddressType: ipv4
+              Scheme: internet-facing
+              SecurityGroups:
+                - !Ref 'ALBSecurityGroup'
+              Subnets: !Split
+                - ','
+                - !If
+                  - IsPrimaryRegion
+                  - !Ref 'PrimaryPublicSubnetIDs'
+                  - !Ref 'FailoverPublicSubnetIDs'
+              Type: application
+            Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+          ALBDNSRecord:
+            DependsOn:
+              - ALB
+            Properties:
+              HostedZoneId: !Ref 'ServiceFQDNZoneID'
+              RecordSets:
+                - AliasTarget:
+                    DNSName: !GetAtt 'ALB.DNSName'
+                    EvaluateTargetHealth: false
+                    HostedZoneId: !GetAtt 'ALB.CanonicalHostedZoneID'
+                  Name: !Ref 'ServiceFQDN'
+                  SetIdentifier: !Ref 'AWS::Region'
+                  Type: A
+                  Weight: !If
+                    - IsPrimaryRegion
+                    - 100
+                    - 0
+            Type: AWS::Route53::RecordSetGroup
+          ALBSecurityGroup:
+            Properties:
+              GroupDescription: ALB Security Group
+              SecurityGroupEgress: []
+              SecurityGroupIngress:
+                - CidrIpv6: ::/0
+                  Description: IPv6 HTTP Access from Internet
+                  FromPort: 80
+                  IpProtocol: tcp
+                  ToPort: 80
+                - CidrIp: '0.0.0.0/0'
+                  Description: IPv4 HTTP Access from Internet
+                  FromPort: 80
+                  IpProtocol: tcp
+                  ToPort: 80
+              VpcId: !If
+                - IsPrimaryRegion
+                - !Ref 'PrimaryVPCID'
+                - !Ref 'FailoverVPCID'
+            Type: AWS::EC2::SecurityGroup
+          Canary:
+            DependsOn:
+              - CanaryRole
+            Properties:
+              Architectures:
+                - arm64
+              Code:
+                ZipFile: "_B=False\n_A=True\nimport sys\nsys.path.append('/opt')\nimport os,time,json,boto3,logging,requests\n\
+                  from datetime import datetime,timedelta\nfrom botocore.exceptions import\
+                  \ ClientError as boto3_client_error\nLOGGER=logging.getLogger()\nLOGGER.setLevel(logging.INFO)\n\
+                  logging.getLogger('boto3').setLevel(logging.INFO)\nlogging.getLogger('botocore').setLevel(logging.INFO)\n\
+                  switch=_B\ndef get_region(context):return context.invoked_function_arn.split(':')[3]\n\
+                  def healthCheck():\n\tA=requests.get(os.environ['ALB_FQDN'],timeout=3)\n\
+                  \tif A.status_code>200:print(A);raise Exception('Failed w/ Code: '+str(A.status_code))\n\
+                  def arcHealthCheck():\n\tglobal switch\n\tif switch==_B:\n\t\tA=boto3.client('route53-recovery-readiness',region_name='us-east-2');print('testing\
+                  \ arcHealthCheck');B=A.get_readiness_check_status(ReadinessCheckName='us-east-2-readiness-check')\n\
+                  \t\tif B['Readiness']=='NOT_READY':switch=_A\ndef handler(event,context):\n\
+                  \tLOGGER.info('----- REQUEST RECEIVED -----');LOGGER.info(json.dumps(event));B=datetime.now();C=B+timedelta(seconds=50);A=0;print('Beginning\
+                  \ Health Checks')\n\twhile datetime.now()<C:\n\t\ttry:healthCheck()\n\t\t\
+                  except Exception as D:print('Health Check Failed');A=A+1;print(D)\n\t\t\
+                  if A>1:print('More Than 1 Failure Detected - Failing to Other Region');fail_to_other_region(context);return\
+                  \ _A\n\t\ttime.sleep(10)\n\treturn _A\ndef fail_to_other_region(lambda_context):\n\
+                  \tH='Weight';G='SERVICE_FQDN';F='SERVICE_FQDN_ZONE_ID';B=boto3.client('route53')\n\
+                  \ttry:print('Retrieving Existing R53 Records');C=B.list_resource_record_sets(HostedZoneId=os.environ[F],StartRecordName=os.environ[G],StartRecordType='A')\n\
+                  \texcept boto3_client_error as E:raise Exception('Unable to Retrieve R53\
+                  \ Records')\n\tD=[]\n\tfor A in C['ResourceRecordSets']:\n\t\tif A['Name'][0:-1]==os.environ[G]:\n\
+                  \t\t\tif A['SetIdentifier']==get_region(lambda_context):A[H]=0\n\t\t\telse:A[H]=100\n\
+                  \t\t\tD.append({'Action':'UPSERT','ResourceRecordSet':A})\n\ttry:print('Updating\
+                  \ R53 Records w/ New Weights');C=B.change_resource_record_sets(ChangeBatch={'Changes':D},HostedZoneId=os.environ[F])\n\
+                  \texcept Exception as E:raise Exception('Unable to Update R53 Records')\n\
+                  \treturn _A"
+              Description: ''
+              Environment:
+                Variables:
+                  ALB_FQDN: !GetAtt 'ALB.DNSName'
+                  RDS_PROXY_ENDPOINT: !GetAtt 'RDSProxy.Endpoint'
+                  SERVICE_FQDN: !Ref 'ServiceFQDN'
+                  SERVICE_FQDN_ZONE_ID: !Ref 'ServiceFQDNZoneID'
+              Handler: index.handler
+              Layers:
+                - !Ref 'LambdaLayerCreatorResource'
+              MemorySize: 128
+              Role: !GetAtt 'CanaryRole.Arn'
+              Runtime: python3.9
+              Timeout: 65
+              TracingConfig:
+                Mode: PassThrough
+            Type: AWS::Lambda::Function
+          CanaryInvoker:
+            DependsOn:
+              - Canary
+            Properties:
+              Description: !Join
+                - ''
+                - - Invokes regional DB Canary.
+              ScheduleExpression: rate(1 minute)
+              State: ENABLED
+              Targets:
+                - Arn: !GetAtt 'Canary.Arn'
+                  Id: Canary
+            Type: AWS::Events::Rule
+          CanaryInvokerPermission:
+            DependsOn:
+              - Canary
+              - CanaryInvoker
+            Properties:
+              Action: lambda:InvokeFunction
+              FunctionName: !Ref 'Canary'
+              Principal: events.amazonaws.com
+              SourceArn: !GetAtt 'CanaryInvoker.Arn'
+            Type: AWS::Lambda::Permission
+          CanaryLogGroup:
+            DependsOn:
+              - Canary
+            Properties:
+              LogGroupName: !Join
+                - ''
+                - - /aws/lambda/
+                  - !Ref 'Canary'
+              RetentionInDays: 30
+            Type: AWS::Logs::LogGroup
+          CanaryRole:
+            DependsOn: []
+            Properties:
+              AssumeRolePolicyDocument:
+                Statement:
+                  - Action:
+                      - sts:AssumeRole
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - lambda.amazonaws.com
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              MaxSessionDuration: 3600
+              Policies:
+                - PolicyDocument:
+                    Statement:
+                      - Action:
+                          - rds-db:Connect
+                        Effect: Allow
+                        Resource:
+                          - !GetAtt 'RDSProxy.DBProxyArn'
+                        Sid: ConnectToRDSProxy
+                      - Action:
+                          - route53:ListResourceRecordSets
+                          - route53:ChangeResourceRecordSets
+                        Effect: Allow
+                        Resource:
+                          - !Join
+                            - ''
+                            - - 'arn:'
+                              - !Ref 'AWS::Partition'
+                              - :route53:::hostedzone/
+                              - !Ref 'ServiceFQDNZoneID'
+                        Sid: GetAndUpdateR53Records
+                  PolicyName: main-policy
+            Type: AWS::IAM::Role
+          Dashboard:
+            DependsOn:
+              - DashboardRole
+            Properties:
+              Architectures:
+                - arm64
+              Code:
+                ZipFile: "import json,boto3\ndef get_region(context):return context.invoked_function_arn.split(':')[3]\n\
+                  def handler(event,context):\n\tn=\"SELECT to_char(migratedon,'YYYY-MM-DD\
+                  \ HH:MI:SS'), count(1) from dataserver where insertedon <> migratedon group\
+                  \ by to_char(migratedon,'YYYY-MM-DD HH:MI:SS') order by to_char(migratedon,'YYYY-MM-DD\
+                  \ HH:MI:SS') desc\";m='testdb';l='postgres-admin';k='require';j='5432';i='postgres';h='text/html';g='content-type';f='body';e='headers';d='statusCode';T='<th>Time</th><th>#\
+                  \ Transactions</th>';O='<tr><td>{0}</td><td>{1}</td></tr>';L='</table>';K='<table\
+                  \ border=1>';o=boto3.client('rds');return{d:200,e:{g:h},f:get_region(context)};F=psycopg2.connect(user=i,port=j,host='database-1.cluster-cmpxbyyj1acf.us-east-1.rds.amazonaws.com',sslmode=k,password=l,database=m);A=F.cursor();A.execute('SELECT\
+                  \ * from dataclient');E=A.fetchall();A.execute('SELECT region, http_code,\
+                  \ count(1) from dataclient group by region, http_code');U=A.fetchall();A.execute('SELECT\
+                  \ count(1) from dataserver');V=A.fetchone()[0];A.execute(\"SELECT to_char(insertedon,'YYYY-MM-DD\
+                  \ HH:MI:SS'), count(1) from dataserver group by to_char(insertedon,'YYYY-MM-DD\
+                  \ HH:MI:SS') order by to_char(insertedon,'YYYY-MM-DD HH:MI:SS') desc\");W=A.fetchall();A.execute(n);X=A.fetchall();A.execute(\"\
+                  select dataclient.guid from dataclient left join dataserver on dataclient.guid\
+                  \ = dataserver.guid where dataserver.id is null and http_code='200'\");Y=A.fetchall();A.close();F.close();F=psycopg2.connect(host='database-1.cluster-cs0mqb7gsznh.us-west-2.rds.amazonaws.com',database=m,user=i,password=l,port=j,sslmode=k);A=F.cursor();A.execute('SELECT\
+                  \ count(1) from dataserver ');Z=A.fetchone()[0];A.execute('SELECT guid from\
+                  \ dataserver ');p=A.fetchall();A.execute(n);a=A.fetchall();A.close();F.close();P=0;Q=0;R=1;S=0;H=[]\n\
+                  \tif len(E)>0:b=min((A[3]for A in E if A[2]>-1));c=max((A[3]for A in E if\
+                  \ A[2]>-1));S=(c-b).total_seconds();H=list(filter(lambda d:d[2]==500,E))\n\
+                  \tif len(H)>0:M=min((A[3]for A in H if A[2]==500));N=max((A[3]for A in H\
+                  \ if A[2]==500));P=(N-M).total_seconds()+1;R=sum((1 for A in E if A[3]>=M\
+                  \ and A[3]<=N));Q=sum((1 for A in E if A[3]>=M and A[3]<=N and A[2]==500))\n\
+                  \tI=K;I+='<th>Region</th><th>Status Code</th><th># Records</th>'\n\tfor\
+                  \ C in U:I+='<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>'.format(C[0],C[1],C[2])\n\
+                  \tI+=L;G='<h1>Total Records Written/Replicated To Each Region</h1>';G+=K;G+='<th>us-east-1</th><th>us-west-2</th>';G+=O.format(V,Z);G+=L;J=K;J+=T\n\
+                  \tfor C in W:J+=O.format(C[0],C[1])\n\tJ+=L;D='<h2>Replications Per Second\
+                  \ in us-east-1</h2>';D+=K;D+=T\n\tfor C in X:D+=O.format(C[0],C[1])\n\t\
+                  D+=L;D+='<h2>Replications Per Second in us-west-2</h2>';D+=K;D+=T\n\tfor\
+                  \ C in a:D+=O.format(C[0],C[1])\n\tD+=L;B=\"<html><head></head><body><form\
+                  \ action='/delete'>\";B=B+\"<input type='submit' style='background-color:red;color:white'\
+                  \ value='cleanup'/></form>\";B=B+'<h1>Test Run: {0} seconds</h1>';B=B+'<h1>Results</h1>{1}{2}';B=B+'<h1>RTO</h1>';B=B+'<table\
+                  \ border=1><th>Seconds</th><th>% Loss</th><tr><td>{3}</td><td>{4}&nbsp;</td></tr></table>';B=B+'<h1>RPO</h1>';B=B+'<table\
+                  \ border=1><th>Missing</th><tr><td>{5}</td></tr></table>';B=B+'<h1>Transactions\
+                  \ Per Second</h1>{6}';B=B+'<h1>Replications Per Second</h1>{7}</html>';B=B.format(S,I,G,P,Q*100/R,len(Y),J,D);return{d:200,e:{g:h},f:B}"
+              Description: ''
+              Environment:
+                Variables:
+                  RDS_PROXY_ENDPOINT: !GetAtt 'RDSProxy.Endpoint'
+              Handler: index.handler
+              Layers:
+                - !Ref 'LambdaLayerCreatorResource'
+              MemorySize: 128
+              Role: !GetAtt 'DashboardRole.Arn'
+              Runtime: python3.9
+              Timeout: 15
+              TracingConfig:
+                Mode: PassThrough
+            Type: AWS::Lambda::Function
+          DashboardListenerRule:
+            DependsOn:
+              - Port80ALBListener
+            Properties:
+              Actions:
+                - TargetGroupArn: !Ref 'DashboardTargetGroup'
+                  Type: forward
+              Conditions:
+                - Field: path-pattern
+                  PathPatternConfig:
+                    Values:
+                      - /dashboard
+              ListenerArn: !Ref 'Port80ALBListener'
+              Priority: 1
+            Type: AWS::ElasticLoadBalancingV2::ListenerRule
+          DashboardLogGroup:
+            DependsOn:
+              - Dashboard
+            Properties:
+              LogGroupName: !Join
+                - ''
+                - - /aws/lambda/
+                  - !Ref 'Dashboard'
+              RetentionInDays: 30
+            Type: AWS::Logs::LogGroup
+          DashboardRole:
+            DependsOn: []
+            Properties:
+              AssumeRolePolicyDocument:
+                Statement:
+                  - Action:
+                      - sts:AssumeRole
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - lambda.amazonaws.com
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              MaxSessionDuration: 3600
+              Policies:
+                - PolicyDocument:
+                    Statement:
+                      - Action:
+                          - rds-db:Connect
+                        Effect: Allow
+                        Resource:
+                          - !GetAtt 'RDSProxy.DBProxyArn'
+                        Sid: ConnectToRDSProxy
+                  PolicyName: main-policy
+            Type: AWS::IAM::Role
+          DashboardTargetGroup:
+            DependsOn:
+              - Dashboard
+              - DashboardTargetGroupPermission
+            Properties:
+              HealthCheckEnabled: false
+              Matcher:
+                HttpCode: '200'
+              TargetType: lambda
+              Targets:
+                - Id: !GetAtt 'Dashboard.Arn'
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+          DashboardTargetGroupPermission:
+            DependsOn:
+              - Dashboard
+            Properties:
+              Action: lambda:InvokeFunction
+              FunctionName: !Ref 'Dashboard'
+              Principal: elasticloadbalancing.amazonaws.com
+              SourceAccount: !Ref 'AWS::AccountId'
+            Type: AWS::Lambda::Permission
+          FailoverRDSAdminSecretAttachment:
+            Condition: IsFailoverRegion
+            DependsOn:
+              - RDSAdminSecret
+              - FailoverRDSCluster
+            Properties:
+              SecretId: !Ref 'RDSAdminSecret'
+              TargetId: !Ref 'FailoverRDSCluster'
+              TargetType: AWS::RDS::DBCluster
+            Type: AWS::SecretsManager::SecretTargetAttachment
+          FailoverRDSCluster:
+            Condition: IsFailoverRegion
+            DependsOn:
+              - RDSSubnetGroup
+            Properties:
+              BackupRetentionPeriod: 30
+              DBClusterIdentifier: !Join
+                - ''
+                - - !Ref 'StackSetName'
+                  - '-'
+                  - !Ref 'AWS::Region'
+              DBSubnetGroupName: !Ref 'RDSSubnetGroup'
+              DeletionProtection: false
+              EnableIAMDatabaseAuthentication: false
+              Engine: aurora-postgresql
+              EngineMode: provisioned
+              EngineVersion: '14.3'
+              GlobalClusterIdentifier: !Ref 'StackSetName'
+              KmsKeyId: !If
+                - IsPrimaryRegion
+                - !Ref 'PrimaryKMSKeyID'
+                - !Ref 'FailoverKMSKeyID'
+              Port: 5432
+              RestoreType: copy-on-write
+              StorageEncrypted: true
+              VpcSecurityGroupIds:
+                - !If
+                  - IsPrimaryRegion
+                  - !Ref 'PrimaryDatabaseSecurityGroupID'
+                  - !Ref 'FailoverDatabaseSecurityGroupID'
+            Type: AWS::RDS::DBCluster
+          FailoverRDSInstance1:
+            Condition: IsFailoverRegion
+            DependsOn:
+              - FailoverRDSCluster
+            Properties:
+              AllowMajorVersionUpgrade: false
+              AutoMinorVersionUpgrade: true
+              DBClusterIdentifier: !Ref 'FailoverRDSCluster'
+              DBInstanceClass: db.r6g.large
+              EnablePerformanceInsights: false
+              Engine: aurora-postgresql
+              MultiAZ: false
+              PubliclyAccessible: false
+            Type: AWS::RDS::DBInstance
+          FailoverRDSInstance2:
+            Condition: IsFailoverRegion
+            DependsOn:
+              - FailoverRDSCluster
+            Properties:
+              AllowMajorVersionUpgrade: false
+              AutoMinorVersionUpgrade: true
+              DBClusterIdentifier: !Ref 'FailoverRDSCluster'
+              DBInstanceClass: db.r6g.large
+              EnablePerformanceInsights: false
+              Engine: aurora-postgresql
+              MultiAZ: false
+              PubliclyAccessible: false
+            Type: AWS::RDS::DBInstance
+          GlobalRDSCluster:
+            Condition: IsPrimaryRegion
+            DependsOn:
+              - PrimaryRDSCluster
+            Properties:
+              DeletionProtection: false
+              GlobalClusterIdentifier: !Ref 'StackSetName'
+              SourceDBClusterIdentifier: !Ref 'PrimaryRDSCluster'
+            Type: AWS::RDS::GlobalCluster
+          LambdaLayerCreator:
+            DependsOn:
+              - LambdaLayerCreatorRole
+            Properties:
+              Architectures:
+                - arm64
+              Code:
+                ZipFile: "import sys,subprocess\nsubprocess.call('pip install cfnresponse\
+                  \ -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n\
+                  sys.path.insert(1,'/tmp/')\nimport io,os,json,boto3,cfnresponse\nfrom zipfile\
+                  \ import ZipFile\nfrom botocore.exceptions import ClientError,ParamValidationError\n\
+                  def zip_directory(path):\n\tfor (B,F,C) in os.walk(path):\n\t\tfor D in\
+                  \ C:A=os.path.join(B,D);E=A[len(path)+len(os.sep):];yield(A,E)\ndef make_zip_file_bytes(path):\n\
+                  \tA=io.BytesIO()\n\twith ZipFile(A,'w')as B:\n\t\tfor (C,D) in zip_directory(path=path):B.write(C,D)\n\
+                  \treturn A.getvalue()\n'\\n    - Region | str\\n    - Packages | list\\\
+                  n    - LayerName | str\\n'\ndef handler(event,context):\n\tJ='RequestType';I='ResourceProperties';B=context;A=event;print(json.dumps(A));C=A[I]['Properties'];K=A[I]['Type'].replace('Custom::','');D={};E=boto3.Session(region_name=C['Region']);F=E.client('lambda')\n\
+                  \tif A[J]in['Create','Update']:\n\t\tsubprocess.call(('pip install '+' '.join(C['Packages'])+'\
+                  \ -t /tmp/lambda-layer --no-cache-dir').split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n\
+                  \t\ttry:G=F.publish_layer_version(LayerName=C['LayerName'],Content={'ZipFile':make_zip_file_bytes('/tmp/lambda-layer')},CompatibleRuntimes=['python3.9'],CompatibleArchitectures=['x86_64','arm64']);return\
+                  \ cfnresponse.send(A,B,cfnresponse.SUCCESS,D,G['LayerVersionArn'])\n\t\t\
+                  except ClientError as H:print('Failed to Deploy Lambda Layer: '+str(H.response));return\
+                  \ cfnresponse.send(A,B,cfnresponse.FAILED,D)\n\tif A[J]in['Delete']:\"\\\
+                  n        response = client.list_layer_versions(\\n            CompatibleRuntime='nodejs'|'nodejs4.3'|'nodejs6.10'|'nodejs8.10'|'nodejs10.x'|'nodejs12.x'|'nodejs14.x'|'java8'|'java8.al2'|'java11'|'python2.7'|'python3.6'|'python3.7'|'python3.8'|'python3.9'|'dotnetcore1.0'|'dotnetcore2.0'|'dotnetcore2.1'|'dotnetcore3.1'|'dotnet6'|'nodejs4.3-edge'|'go1.x'|'ruby2.5'|'ruby2.7'|'provided'|'provided.al2',\\\
+                  n            LayerName='string',\\n            Marker='string',\\n     \
+                  \       MaxItems=123,\\n            CompatibleArchitecture='x86_64'|'arm64'\\\
+                  n        )\\n        \\n        for each layer version, delete it\\n   \
+                  \     \\n        response = client.delete_layer_version(\\n            LayerName='string',\\\
+                  n            VersionNumber=123\\n        )\\n        \";return cfnresponse.send(A,B,cfnresponse.SUCCESS,D)"
+              Description: ''
+              Handler: index.handler
+              Layers: []
+              MemorySize: 256
+              Role: !GetAtt 'LambdaLayerCreatorRole.Arn'
+              Runtime: python3.9
+              Timeout: 30
+              TracingConfig:
+                Mode: PassThrough
+            Type: AWS::Lambda::Function
+          LambdaLayerCreatorLogGroup:
+            DependsOn:
+              - LambdaLayerCreator
+            Properties:
+              LogGroupName: !Join
+                - ''
+                - - /aws/lambda/
+                  - !Ref 'LambdaLayerCreator'
+              RetentionInDays: 30
+            Type: AWS::Logs::LogGroup
+          LambdaLayerCreatorResource:
+            DependsOn:
+              - LambdaLayerCreatorLogGroup
+            Properties:
+              Properties:
+                LayerName: !Ref 'AWS::StackName'
+                Packages:
+                  - requests
+                  - psycopg2-binary
+                Region: !Ref 'AWS::Region'
+              ServiceToken: !GetAtt 'LambdaLayerCreator.Arn'
+              Type: Custom::DeployLambdaLayer
+              Version: '1.0'
+            Type: AWS::CloudFormation::CustomResource
+          LambdaLayerCreatorRole:
+            DependsOn: []
+            Properties:
+              AssumeRolePolicyDocument:
+                Statement:
+                  - Action:
+                      - sts:AssumeRole
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - lambda.amazonaws.com
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              MaxSessionDuration: 3600
+              Policies:
+                - PolicyDocument:
+                    Statement:
+                      - Action:
+                          - lambda:ListLayerVersions
+                          - lambda:DeleteLayerVersion
+                          - lambda:PublishLayerVersion
+                        Effect: Allow
+                        Resource:
+                          - '*'
+                        Sid: CreateLambdaLayer
+                  PolicyName: main-policy
+            Type: AWS::IAM::Role
+          MainSite:
+            DependsOn:
+              - MainSiteRole
+            Properties:
+              Architectures:
+                - arm64
+              Code:
+                ZipFile: "import sys\nsys.path.append('/opt')\nimport os,json,boto3,psycopg2\n\
+                  from datetime import datetime,timedelta\nfrom botocore.exceptions import\
+                  \ ClientError,ParamValidationError\ndef get_region(context):return context.invoked_function_arn.split(':')[3]\n\
+                  def handler(event,context):\n\tF=event;print(json.dumps(F));J=boto3.client('rds');G=boto3.client('secretsmanager')\n\
+                  \ttry:H=G.get_secret_value(SecretId=os.environ['RDS_ADMIN_SECRET_NAME'])\n\
+                  \texcept ClientError as B:print('Unable to retrieva RDS secret: '+str(B));C=500\n\
+                  \telse:\n\t\tA=json.loads(H['SecretString']);I=F['queryStringParameters']['guid']\n\
+                  \t\ttry:\"\\n            login_token = rds_client.generate_db_auth_token(\\\
+                  n                Port = os.environ['RDS_PROXY_PORT'],\\n               \
+                  \ DBUsername = os.environ['RDS_USERNAME'],\\n                DBHostname\
+                  \ = os.environ['RDS_PROXY_ENDPOINT'],\\n            )\\n            \";D=psycopg2.connect(host=A['host'],port=A['port'],user=A['username'],password=A['password'],database='template1',connect_timeout=3,sslmode='require');id=0;C=200;E=D.cursor();E.execute(\"\
+                  INSERT INTO dataserver (guid) VALUES ('{}') RETURNING id\".format(str(I)));id=E.fetchone()[0];D.commit();E.close();D.close()\n\
+                  \t\texcept Exception as B:C=500;print(B)\n\treturn{'statusCode':C,'headers':{'content-type':'text/html'},'body':json.dumps(get_region(context))}"
+              Description: ''
+              Environment:
+                Variables:
+                  RDS_ADMIN_SECRET_NAME: !Ref 'RDSAdminSecret'
+                  RDS_PROXY_ENDPOINT: !GetAtt 'RDSProxy.Endpoint'
+                  RDS_PROXY_PORT: !If
+                    - IsPrimaryRegion
+                    - !GetAtt 'PrimaryRDSCluster.Endpoint.Port'
+                    - !GetAtt 'FailoverRDSCluster.Endpoint.Port'
+                  RDS_USERNAME: DemoAdmin
+              Handler: index.handler
+              Layers:
+                - !Ref 'LambdaLayerCreatorResource'
+              MemorySize: 128
+              Role: !GetAtt 'MainSiteRole.Arn'
+              Runtime: python3.9
+              Timeout: 15
+              TracingConfig:
+                Mode: PassThrough
+            Type: AWS::Lambda::Function
+          MainSiteLogGroup:
+            DependsOn:
+              - MainSite
+            Properties:
+              LogGroupName: !Join
+                - ''
+                - - /aws/lambda/
+                  - !Ref 'MainSite'
+              RetentionInDays: 30
+            Type: AWS::Logs::LogGroup
+          MainSiteRole:
+            DependsOn: []
+            Properties:
+              AssumeRolePolicyDocument:
+                Statement:
+                  - Action:
+                      - sts:AssumeRole
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - lambda.amazonaws.com
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              MaxSessionDuration: 3600
+              Policies:
+                - PolicyDocument:
+                    Statement:
+                      - Action:
+                          - rds-db:Connect
+                        Effect: Allow
+                        Resource:
+                          - !GetAtt 'RDSProxy.DBProxyArn'
+                        Sid: ConnectToRDSProxy
+                  PolicyName: main-policy
+            Type: AWS::IAM::Role
+          MainSiteTargetGroup:
+            DependsOn:
+              - MainSite
+              - MainSiteTargetGroupPermission
+            Properties:
+              HealthCheckEnabled: false
+              Matcher:
+                HttpCode: '200'
+              TargetType: lambda
+              Targets:
+                - Id: !GetAtt 'MainSite.Arn'
+            Type: AWS::ElasticLoadBalancingV2::TargetGroup
+          MainSiteTargetGroupPermission:
+            DependsOn:
+              - MainSite
+            Properties:
+              Action: lambda:InvokeFunction
+              FunctionName: !Ref 'MainSite'
+              Principal: elasticloadbalancing.amazonaws.com
+              SourceAccount: !Ref 'AWS::AccountId'
+            Type: AWS::Lambda::Permission
+          Port80ALBListener:
+            DependsOn:
+              - ALB
+              - MainSiteTargetGroup
+            Properties:
+              DefaultActions:
+                - TargetGroupArn: !Ref 'MainSiteTargetGroup'
+                  Type: forward
+              LoadBalancerArn: !Ref 'ALB'
+              Port: 80
+              Protocol: HTTP
+            Type: AWS::ElasticLoadBalancingV2::Listener
+          PrimaryRDSAdminSecretAttachment:
+            Condition: IsPrimaryRegion
+            DependsOn:
+              - RDSAdminSecret
+              - PrimaryRDSCluster
+            Properties:
+              SecretId: !Ref 'RDSAdminSecret'
+              TargetId: !Ref 'PrimaryRDSCluster'
+              TargetType: AWS::RDS::DBCluster
+            Type: AWS::SecretsManager::SecretTargetAttachment
+          PrimaryRDSCluster:
+            Condition: IsPrimaryRegion
+            DeletionPolicy: Snapshot
+            DependsOn:
+              - RDSSubnetGroup
+            Properties:
+              BackupRetentionPeriod: 30
+              DBClusterIdentifier: !Join
+                - ''
+                - - !Ref 'StackSetName'
+                  - '-'
+                  - !Ref 'AWS::Region'
+              DBSubnetGroupName: !Ref 'RDSSubnetGroup'
+              DeletionProtection: false
+              EnableIAMDatabaseAuthentication: false
+              Engine: aurora-postgresql
+              EngineMode: provisioned
+              EngineVersion: '14.3'
+              KmsKeyId: !If
+                - IsPrimaryRegion
+                - !Ref 'PrimaryKMSKeyID'
+                - !Ref 'FailoverKMSKeyID'
+              MasterUserPassword: !Ref 'DBAdminPassword'
+              MasterUsername: !Ref 'DBAdminUsername'
+              Port: 5432
+              StorageEncrypted: true
+              VpcSecurityGroupIds:
+                - !If
+                  - IsPrimaryRegion
+                  - !Ref 'PrimaryDatabaseSecurityGroupID'
+                  - !Ref 'FailoverDatabaseSecurityGroupID'
+            Type: AWS::RDS::DBCluster
+          PrimaryRDSInstance1:
+            Condition: IsPrimaryRegion
+            DependsOn:
+              - PrimaryRDSCluster
+            Properties:
+              AllowMajorVersionUpgrade: false
+              AutoMinorVersionUpgrade: true
+              DBClusterIdentifier: !Ref 'PrimaryRDSCluster'
+              DBInstanceClass: db.r6g.large
+              EnablePerformanceInsights: false
+              Engine: aurora-postgresql
+              MultiAZ: false
+              PubliclyAccessible: false
+            Type: AWS::RDS::DBInstance
+          PrimaryRDSInstance2:
+            Condition: IsPrimaryRegion
+            DependsOn:
+              - PrimaryRDSCluster
+            Properties:
+              AllowMajorVersionUpgrade: false
+              AutoMinorVersionUpgrade: true
+              DBClusterIdentifier: !Ref 'PrimaryRDSCluster'
+              DBInstanceClass: db.r6g.large
+              EnablePerformanceInsights: false
+              Engine: aurora-postgresql
+              MultiAZ: false
+              PubliclyAccessible: false
+            Type: AWS::RDS::DBInstance
+          RDSAdminSecret:
+            Properties:
+              Description: RDS Cluster Admin Account
+              KmsKeyId: !If
+                - IsPrimaryRegion
+                - !Ref 'PrimaryKMSKeyID'
+                - !Ref 'FailoverKMSKeyID'
+              SecretString: !Join
+                - ''
+                - - '{"username": "'
+                  - !Ref 'DBAdminUsername'
+                  - '", "password": "'
+                  - !Ref 'DBAdminPassword'
+                  - '"}'
+            Type: AWS::SecretsManager::Secret
+          RDSClusterParameterGroup:
+            Properties:
+              Description: !Join
+                - ''
+                - - !Ref 'AWS::StackName'
+                  - ' - Cluster Param Group'
+              Family: aurora-postgresql13
+              Parameters:
+                rds.logical_replication: 1
+                wal_sender_timeout: 240000
+            Type: AWS::RDS::DBClusterParameterGroup
+          RDSProxy:
+            Properties:
+              Auth:
+                - SecretArn: !Ref 'RDSAdminSecret'
+              DBProxyName: !If
+                - IsPrimaryRegion
+                - !Ref 'PrimaryRDSCluster'
+                - !Ref 'FailoverRDSCluster'
+              EngineFamily: POSTGRESQL
+              RequireTLS: true
+              RoleArn: !GetAtt 'RDSProxyRole.Arn'
+              VpcSecurityGroupIds:
+                - !If
+                  - IsPrimaryRegion
+                  - !Ref 'PrimaryDatabaseSecurityGroupID'
+                  - !Ref 'FailoverDatabaseSecurityGroupID'
+              VpcSubnetIds: !Split
+                - ','
+                - !If
+                  - IsPrimaryRegion
+                  - !Ref 'PrimaryPrivateSubnetIDs'
+                  - !Ref 'FailoverPrivateSubnetIDs'
+            Type: AWS::RDS::DBProxy
+          RDSProxyRole:
+            DependsOn:
+              - RDSAdminSecret
+            Properties:
+              AssumeRolePolicyDocument:
+                Statement:
+                  - Action:
+                      - sts:AssumeRole
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - rds.amazonaws.com
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/AdministratorAccess
+              Policies:
+                - PolicyDocument:
+                    Statement:
+                      - Action:
+                          - secretsmanager:GetSecretValue
+                        Effect: Allow
+                        Resource:
+                          - !Ref 'RDSAdminSecret'
+                  PolicyName: main-policy
+            Type: AWS::IAM::Role
+          RDSSubnetGroup:
+            Properties:
+              DBSubnetGroupDescription: Database Subnets
+              DBSubnetGroupName: !Join
+                - ''
+                - - !Ref 'AWS::StackName'
+                  - !Join
+                    - ''
+                    - !Split
+                      - subnet-
+                      - !Join
+                        - '-'
+                        - !Split
+                          - ','
+                          - !If
+                            - IsPrimaryRegion
+                            - !Ref 'PrimaryPrivateSubnetIDs'
+                            - !Ref 'FailoverPrivateSubnetIDs'
+              SubnetIds: !Split
+                - ','
+                - !If
+                  - IsPrimaryRegion
+                  - !Ref 'PrimaryPrivateSubnetIDs'
+                  - !Ref 'FailoverPrivateSubnetIDs'
+            Type: AWS::RDS::DBSubnetGroup
+          TestTrafficTopic:
+            Type: AWS::SNS::Topic
+          TrafficGenerator:
+            DependsOn:
+              - TrafficGeneratorRole
+            Properties:
+              Architectures:
+                - arm64
+              Code:
+                ZipFile: "import os,json,time,boto3\ndef lambda_handler(event,context):\n\t\
+                  A=boto3.client('sns')\n\tfor B in range(0,100):A.publish(Message='Hello',TargetArn=os.environ['SNS_TOPIC_ARN']);time.sleep(1.5)\n\
+                  \treturn{'statusCode':200,'body':None}"
+              Description: ''
+              Environment:
+                Variables:
+                  SNS_TOPIC_ARN: !Ref 'TestTrafficTopic'
+              Handler: index.handler
+              Layers: []
+              MemorySize: 128
+              Role: !GetAtt 'TrafficGeneratorRole.Arn'
+              Runtime: python3.9
+              Timeout: 180
+              TracingConfig:
+                Mode: PassThrough
+            Type: AWS::Lambda::Function
+          TrafficGeneratorLogGroup:
+            DependsOn:
+              - TrafficGenerator
+            Properties:
+              LogGroupName: !Join
+                - ''
+                - - /aws/lambda/
+                  - !Ref 'TrafficGenerator'
+              RetentionInDays: 30
+            Type: AWS::Logs::LogGroup
+          TrafficGeneratorRole:
+            DependsOn: []
+            Properties:
+              AssumeRolePolicyDocument:
+                Statement:
+                  - Action:
+                      - sts:AssumeRole
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - lambda.amazonaws.com
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              MaxSessionDuration: 3600
+              Policies:
+                - PolicyDocument:
+                    Statement:
+                      - Action:
+                          - sns:Publish
+                        Effect: Allow
+                        Resource:
+                          - !Ref 'TestTrafficTopic'
+                        Sid: SendMessagesToSNS
+                  PolicyName: main-policy
+            Type: AWS::IAM::Role
+        Transform:
+          Name: AWS::SecretsManager-2020-07-23
+    Type: AWS::CloudFormation::StackSet
+  StackSetAdministrationRole:
+    DependsOn:
+      - StackSetExecutionRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - sts:AssumeRole
+                Effect: Allow
+                Resource:
+                  - !GetAtt 'StackSetExecutionRole.Arn'
+          PolicyName: main-policy
+    Type: AWS::IAM::Role
+  StackSetExecutionRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Ref 'AWS::AccountId'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+    Type: AWS::IAM::Role
