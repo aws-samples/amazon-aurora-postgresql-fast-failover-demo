@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>AWS - Dashboard Aurora Failover</title>
+
+    <link type="text/css" href="style.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <link rel="icon" type="image/ico" href="https://a0.awsstatic.com/libra-css/images/site/fav/favicon.ico">
+
+    <style>
+        .badge-secondary {
+            color: #fff;
+            background-color: #adb5bd;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25em 0.4em;
+            font-size: 75%;
+            font-weight: 700;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 0.25rem;
+            transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+        }
+        
+        .badge-success {
+            color: #fff;
+            background-color: #28a745;
+        }
+        
+        .mb-70{
+             margin-bottom: 70px;
+        }
+        
+        .card {
+            box-shadow: 0 0.46875rem 2.1875rem rgba(4,9,20,0.03), 0 0.9375rem 1.40625rem rgba(4,9,20,0.03), 0 0.25rem 0.53125rem rgba(4,9,20,0.05), 0 0.125rem 0.1875rem rgba(4,9,20,0.03);
+            border-width: 0;
+            transition: all .2s;
+        }
+        
+        .card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            word-wrap: break-word;
+            background-color: #fff;
+            background-clip: border-box;
+            border: 1px solid rgba(26,54,126,0.125);
+            border-radius: .25rem;
+        }
+        
+        .card-body {
+            flex: 1 1 auto;
+            padding: 0px;
+        }
+        .vertical-timeline {
+            width: 100%;
+            position: relative;
+            padding: 1.5rem 0 1rem;
+        }
+        
+        .vertical-timeline::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 67px;
+            height: 100%;
+            width: 4px;
+            background: #e9ecef;
+            border-radius: .25rem;
+        }
+        
+        .vertical-timeline-element {
+            position: relative;
+            margin: 0 0 1rem;
+        }
+        
+        .vertical-timeline--animate .vertical-timeline-element-icon.bounce-in {
+            visibility: visible;
+            animation: cd-bounce-1 .8s;
+        }
+        .vertical-timeline-element-icon {
+            position: absolute;
+            top: 0;
+            left: 60px;
+        }
+        
+        .vertical-timeline-element-icon .badge-dot-xl {
+            box-shadow: 0 0 0 5px #fff;
+        }
+        
+        .badge-dot-xl {
+            width: 18px;
+            height: 18px;
+            position: relative;
+        }
+        .badge:empty {
+            display: none;
+        }
+        
+        .badge-dot-xl::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: .25rem;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            margin: -5px 0 0 -5px;
+            background: #fff;
+        }
+        
+        .vertical-timeline-element-content {
+            position: relative;
+            margin-left: 90px;
+            font-size: .8rem;
+        }
+        
+        .vertical-timeline-element-content .timeline-title {
+            
+            text-transform: uppercase;
+            margin: 0 0 .5rem;
+            padding: 2px 0 0;
+            font-weight: bold;
+        }
+        
+        .vertical-timeline-element-content .vertical-timeline-element-date {
+            display: block;
+            position: absolute;
+            left: -90px;
+            top: 0;
+            padding-right: 10px;
+            text-align: right;
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+        
+        .vertical-timeline-element-content:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+        
+        .error {
+        	color: red;	
+        }
+        
+        .center {
+          margin: auto;
+          width: 50%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav id="sidebarMenu" class="sidebar d-lg-block bg-gray-800 text-white collapse" data-simplebar>
+        <div class="sidebar-inner px-4 pt-3">
+
+            <ul class="nav flex-column pt-3 pt-md-0">
+                <li class="nav-item">
+                    <button id="bypass" type="button" class="btn btn-secondary bypass">Bypass RDS Proxy</button>
+
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="btn btn-secondary send_requests">Send client traffic</button>
+
+                </li>
+
+                <li class="nav-item">
+                    <button type="button" class="btn btn-secondary trigger_failover">Send failover request</button>
+
+                </li>
+
+                <li class="nav-item">
+                    <button type="button" class="btn btn-secondary clean">Clean</button>
+
+                </li>
+
+            </ul>
+        </div>
+    </nav>
+
+    <main class="content">
+
+        <div class="row">
+            <div class="col-12 col-xl-9" style="padding:0px 20px">
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <div class="card border-0 shadow">
+
+                            <div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div id="myCarousel" class="center carousel slide-fade" data-ride="carousel" data-interval="false">
+
+                                            <!-- Indicators -->
+                                            <ol class="carousel-indicators">
+                                                <li data-target="#myCarousel" data-slide-to="0" class="active"></li>
+                                            </ol>
+
+                                            <!-- Wrapper for slides -->
+                                            <div class="carousel-inner">
+                                                <div class="item active">
+                                                    <img src="img\1_3.jpg" alt="1">
+                                                </div>
+                                                <div class="item">
+                                                    <img src="img\1_4.jpg" alt="2">
+                                                </div>
+                                                <div class="item">
+                                                    <img src="img\1_1.jpg" alt="3">
+                                                </div>
+                                                <div class="item">
+                                                    <img src="img\1_2.jpg" alt="4">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-6">
+                                        <canvas id="mycanvas"></canvas>
+                                    </div>
+
+                                    <div class="col-6">
+                                        <canvas id="cvsError"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-3">
+                <div class="col-12 px-0 mb-4">
+                    <div class="card border-0 shadow">
+                        <div class="card-header d-flex flex-row align-items-center flex-0 border-bottom">
+
+                            <div class="main-card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Events Timeline</h5>
+                                    <div class="vertical-timeline vertical-timeline--animate vertical-timeline--one-column">
+                                        <div class="vertical-timeline-item vertical-timeline-element">
+                                            <div>
+                                                <span class="vertical-timeline-element-icon bounce-in">
+                                                            <i id="denyVPC_badge" class="badge badge-dot badge-dot-xl badge-secondary"> </i>
+                                                        </span>
+                                                <div class="vertical-timeline-element-content bounce-in">
+                                                    <p id="denyVPC_title" style="font-size: 1rem;">FAILOVER REQUESTED</p>
+                                                    <span id="denyVPC_time" class="vertical-timeline-element-date"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="vertical-timeline-item vertical-timeline-element">
+                                            <div>
+                                                <span class="vertical-timeline-element-icon bounce-in">
+                                                            <i id="canaryfailover_badge" class="badge badge-dot badge-dot-xl badge-secondary"> </i>
+                                                        </span>
+                                                <div class="vertical-timeline-element-content bounce-in">
+                                                    <p id="canaryfailover_title" style="font-size: 1rem;">FAILOVER STARTED</p>
+                                                    <p id="canaryfailover_lapsed" style="font-size: 1rem;"></p>
+                                                    <span id="canaryfailover_time" class="vertical-timeline-element-date"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="vertical-timeline-item vertical-timeline-element">
+                                            <div>
+                                                <span class="vertical-timeline-element-icon bounce-in">
+                                                            <i id="aurorafailover_badge" class="badge badge-dot badge-dot-xl badge-secondary"> </i>
+                                                        </span>
+                                                <div class="vertical-timeline-element-content bounce-in">
+                                                    <p id="aurorafailover_title" style="font-size: 1rem;">FAILOVER COMPLETED</p>
+                                                    <p id="aurorafailover_lapsed" style="font-size: 1rem;"></p>
+                                                    <span id="aurorafailover_time" class="vertical-timeline-element-date"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow">
+                        <div class="card-header d-flex flex-row align-items-center flex-0 border-bottom">
+
+                            <div class="main-card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Downtime</h5>
+                                    <div>
+                                        <span id="rto">0</span><span> seconds</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow">
+                        <div class="card-header d-flex flex-row align-items-center flex-0 border-bottom">
+
+                            <div class="main-card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Availability zones</h5>
+                                    <div>
+                                        <span>us-west-1a</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span id="uswest1a"></span>
+                                    </div>
+
+                                    <div>
+                                        <span>us-west-1b</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span id="uswest1b"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+
+    <script>
+        $('.carousel').carousel()
+        	
+        	const queryString = window.location.search;
+        	const urlParams = new URLSearchParams(queryString);
+        	
+        	function sleep(ms) {
+        		return new Promise(resolve => setTimeout(resolve, ms));
+        	}
+        
+        	document.querySelector('.bypass').addEventListener('click', (e) => {
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/bypass');
+        		let result = fetch(request);
+        		console.log(result)	
+        		e.target.textContent = 'RDS Proxy Bypassed';
+        		e.target.className='btn btn-secondary disabled';
+        		$("#myCarousel").carousel(2);
+        	});
+        		
+        	document.querySelector('.clean').addEventListener('click', (e) => {
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/clean');
+        		let result = fetch(request);
+        		console.log(result)	
+        		e.target.textContent = 'Clean';
+        		setTimeout(() => {  location.reload(); }, 5000);	
+        	});
+        
+        	document.querySelector('.send_requests').addEventListener('click', (e) => {
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/sns');
+        		let result = fetch(request);
+        		console.log(result)	
+        		e.target.textContent = 'Sending requests ...';
+        		e.target.className='btn btn-secondary disabled';
+        	});
+        		
+        		
+        	document.querySelector('.trigger_failover').addEventListener('click', (e) => {	
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/failover');
+        		let result = fetch(request);
+        		console.log(result)	
+        		e.target.textContent = 'Failover triggered';
+        		e.target.className='btn btn-secondary disabled';
+        	});
+        
+        	function fetchEvents(){
+        		async function checkEvents() {
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/events');
+        			let result = await fetch(request);
+        			let response = await result.text();
+        			mydata = JSON.parse(response)
+        			
+        			for (var i in mydata) {
+        				
+        				if (mydata[i]['event']=='1'){
+        					$("#denyVPC_badge").addClass("badge-success");
+        					$("#denyVPC_title").addClass("timeline-title");
+        					$("#denyVPC_time").text(mydata[i]['time'])
+        				} else if (mydata[i]['event']=='2'){
+        					$("#canaryfailover_badge").addClass("badge-success");
+        					$("#canaryfailover_title").addClass("timeline-title");
+        					$("#canaryfailover_time").text(mydata[i]['time'])
+        					$("#canaryfailover_lapsed").text('Lapsed ' + Math.round(Math.abs(new Date(mydata[i]['insertedon']) - new Date(mydata[0]['insertedon'])) / 1000) + ' sec')
+        					
+        				} else if (mydata[i]['event']=='3'){
+        					$("#aurorafailover_badge").addClass("badge-success");
+        					$("#aurorafailover_title").addClass("timeline-title");
+        					$("#aurorafailover_time").text(mydata[i]['time'])
+        					$("#aurorafailover_lapsed").text('Lapsed ' + Math.round(Math.abs(new Date(mydata[i]['insertedon']) - new Date(mydata[1]['insertedon'])) / 1000) + ' sec')
+        					console.log($("#bypass").attr('class'))
+        					
+        					
+        					if ($("#bypass").attr('class').includes('disabled')){
+        						$("#myCarousel").carousel(3)
+        					}
+        					else{
+        						$("#myCarousel").carousel(1)
+        					}
+        				}
+        				
+        			}
+        		}
+        		
+        		setInterval(checkEvents, 5000);
+        	}
+        
+        	function fetchRTO(){
+        		async function getRTO() {
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/rto');
+        			let result = await fetch(request);
+        			let response = await result.text();
+        			mydata = JSON.parse(response)
+        			for (var i in mydata) {			
+        				$("#rto").text(mydata[i]['rto'])
+        			}
+        		}
+        		
+        		setInterval(getRTO, 5000);
+        	}
+        
+        	function fetchClusterInfo(){
+        		async function getClusterInfo() {
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/cluster');
+        			let result = await fetch(request);
+        			let response = await result.text();
+        			
+        			mydata = JSON.parse(response)
+        			for (var i in mydata) {	
+        				
+        				az_data = JSON.parse(mydata[i])
+        				if (az_data['az'] == 'us-west-1a'){
+        					$("#uswest1a").text(az_data['type'])
+        					if (az_data['type'] == 'READER')					
+        						$("#uswest1a").css("color","green")
+        					else
+        						$("#uswest1a").css("color","blue")
+        						
+        				}
+        				else if (az_data['az'] == 'us-west-1b')
+        				{
+        					$("#uswest1b").text(az_data['type'])
+        					
+        					if (az_data['type'] == 'READER')
+        						$("#uswest1b").css("color","green")
+        					else
+        						$("#uswest1b").css("color","blue")
+        				}
+        			}
+        		}
+        		
+        		setInterval(getClusterInfo, 5000);
+        	}
+        
+        	fetchEvents()
+        
+        	fetchRTO()
+        
+        	fetchClusterInfo()
+        
+        	function getRandomIntInclusive(min, max) 
+        	{
+				min = Math.ceil(min);
+        		max = Math.floor(max);
+        		return Math.floor(Math.random() * (max - min + 1)) + min;
+        	}
+        
+        	var ctx_live = document.getElementById("mycanvas");
+        	var myChart = new Chart(ctx_live, {
+        	  type: 'line',
+        	  data: {
+        		labels: [],
+        		datasets: [{
+        		  data: [],
+        		  borderWidth: 1,
+        		  borderColor:'#00c0ef',
+        		  label: 'liveCount',
+        		}]
+        	  },
+        	  options: {
+        		responsive: true,
+        		title: {
+        		  display: true,
+        		  text: "Requests returned by us-west-1",
+        		},
+        		legend: {
+        		  display: false
+        		},
+        		scales: {
+        		  yAxes: [{
+        			ticks: {
+        			  beginAtZero: true,
+        			  suggestedMax: 80
+        			}
+        		  }]
+        		}
+        	  }
+        	});
+        
+        	var ctx_error = document.getElementById("cvsError");
+        	var myChartError = new Chart(ctx_error, {
+        	  type: 'line',
+        	  data: {
+        		labels: [],
+        		datasets: [{
+        		  data: [],
+        		  borderWidth: 1,
+        		  borderColor:'red',
+        		  label: 'liveCount',
+        		}]
+        	  },
+        	  options: {
+        		responsive: true,
+        		title: {
+        		  display: true,
+        		  text: "Errors"
+        		},
+        		legend: {
+        		  display: false
+        		},
+        		scales: {
+        		  yAxes: [{
+        			ticks: {
+        			  beginAtZero: true,
+        			  suggestedMax: 80
+        			}
+        		  }]
+        		}
+        	  }
+        	});
+        
+        	function fetchwest1(){
+        		async function getdatawest1() {
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/west1');
+        			let result = await fetch(request);
+        			let response = await result.text();
+        			
+        			mydata = JSON.parse(response)
+        			
+        			for (var i in mydata) {
+        				
+        				
+        				myChart.data.labels=mydata[i]['labels'].split(',')
+        
+        				myChart.data.datasets[0].data=mydata[i]['data'].split(',')
+        				myChart.update('none')			
+        			}	
+        		}
+        		
+        		setInterval(getdatawest1, 5000);
+        	}
+        
+        	fetchwest1()
+        
+        	function fetchErrors(){
+        		async function getErrors() {
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/errors');
+        			let result = await fetch(request);
+        			let response = await result.text();
+        			
+        			mydata = JSON.parse(response)		
+        			for (var i in mydata) {	
+        				myChartError.data.labels=mydata[i]['labels'].split(',')
+        
+        				myChartError.data.datasets[0].data=mydata[i]['data'].split(',')
+        				myChartError.update('none')			
+        			}	
+        		}
+        		
+        		setInterval(getErrors, 5000);
+        	}
+        
+        	fetchErrors()
+    </script>
+</body>
+
+</html>
