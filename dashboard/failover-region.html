@@ -345,14 +345,14 @@
         	const failoverRegionName = urlParams.get('failoverRegion');
         
         	document.querySelector('.send_requests').addEventListener('click', (e) => {
-        	let request = new Request('https://' + urlParams.get('apiHost') + '/sns');
+        	let request = new Request('https://' + urlParams.get('apiHost') + '/v1/sns');
         	let result = fetch(request);
         	console.log(result)	
         	e.target.textContent = 'Sending requests ...';
         	});
         	
         	document.querySelector('.deny_vpc_traffic').addEventListener('click', (e) => {	
-        	let request = new Request('https://' + urlParams.get('apiHost') + '/update');
+        	let request = new Request('https://' + urlParams.get('apiHost') + '/v1/update');
         	let result = fetch(request);
         	console.log(result)	
         	e.target.textContent = 'Traffic denied';
@@ -360,7 +360,7 @@
         	});
         	
         	document.querySelector('.clean').addEventListener('click', (e) => {
-        	let request = new Request('https://' + urlParams.get('apiHost') + '/clean-demo-environment');
+        	let request = new Request('https://' + urlParams.get('apiHost') + '/v1/clean-demo-environment');
         	let result = fetch(request);
         	console.log(result)	
         	e.target.textContent = 'Cleaning ...';
@@ -370,7 +370,7 @@
         
         function fetchEvents(){
             async function checkEvents() {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/get-failover-events');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/get-failover-events');
         		let result = await fetch(request);
         		let response = await result.text();
         		mydata = JSON.parse(response)
@@ -516,7 +516,7 @@
         
         function fetchwest1(){
             async function getdatawest1() {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/west1');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/west1');
         		let result = await fetch(request);
         		let response = await result.text();
         		
@@ -538,7 +538,7 @@
         
         function fetchwest2(){
             async function getdatawest2() {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/west2');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/west2');
         		let result = await fetch(request);
         		let response = await result.text();
         		
@@ -560,7 +560,7 @@
         
         function fetchErrors(){
             async function getErrors() {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/errors');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/errors');
         		let result = await fetch(request);
         		let response = await result.text();
         		
