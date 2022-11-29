@@ -1,5 +1,14 @@
 # Amazon Aurora PostgreSQL Fast Failover Demo
 
+```diff
+! PLEASE NOTE:
+! THE CLOUDWATCH TEMPLATE IN THIS REPO IS NOT WORKING YET
+! BUT WILL BE THERE BY THE TIME RE:INVENT ENDS
+! OR WHEN THIS BANNER DISAPPEARS.
+! PLEASE SAVE THIS REPO URL AND CHECK BACK IN A COUPLE OF DAYS.
+! AND PLEASE PARDON THE DELAY!
+```
+
 ## A simple demonstration of in-region (HA) and cross-region (DR) failover automation using Amazon RDS Aurora PostgreSQL Global Database, RDS Proxy and Route53
 
 ## Cross-region recovery
