@@ -340,8 +340,9 @@
     <script>
         $('.carousel').carousel()
         
-            const queryString = window.location.search;
-        	const urlParams = new URLSearchParams(queryString);
+            const urlParams = new URLSearchParams(window.location.search);
+        	const primaryRegionName = urlParams.get('primaryRegion');
+        	const failoverRegionName = urlParams.get('failoverRegion');
         
         	document.querySelector('.send_requests').addEventListener('click', (e) => {
         	let request = new Request('https://' + urlParams.get('apiHost') + '/sns');
@@ -359,7 +360,7 @@
         	});
         	
         	document.querySelector('.clean').addEventListener('click', (e) => {
-        	let request = new Request('https://' + urlParams.get('apiHost') + '/clean');
+        	let request = new Request('https://' + urlParams.get('apiHost') + '/clean-demo-environment');
         	let result = fetch(request);
         	console.log(result)	
         	e.target.textContent = 'Cleaning ...';
@@ -369,7 +370,7 @@
         
         function fetchEvents(){
             async function checkEvents() {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/events');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/get-failover-events');
         		let result = await fetch(request);
         		let response = await result.text();
         		mydata = JSON.parse(response)

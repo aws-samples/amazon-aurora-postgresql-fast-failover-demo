@@ -311,13 +311,13 @@
                                 <div class="card-body">
                                     <h5 class="card-title">Availability zones</h5>
                                     <div>
-                                        <span>us-west-1a</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                                        <span id="uswest1a"></span>
+                                        <span id="primaryRegionZoneALabel"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span id="primaryRegionZoneAStatus"></span>
                                     </div>
 
                                     <div>
-                                        <span>us-west-1b</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                                        <span id="uswest1b"></span>
+                                        <span id="primaryRegionZoneBLabel"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span id="primaryRegionZoneBStatus"></span>
                                     </div>
                                 </div>
                             </div>
@@ -336,15 +336,16 @@
     <script>
         $('.carousel').carousel()
         	
-        	const queryString = window.location.search;
-        	const urlParams = new URLSearchParams(queryString);
+        	const urlParams = new URLSearchParams(window.location.search);
+        	const primaryRegionName = urlParams.get('primaryRegion');
+        	const failoverRegionName = urlParams.get('failoverRegion');
         	
         	function sleep(ms) {
         		return new Promise(resolve => setTimeout(resolve, ms));
         	}
         
         	document.querySelector('.bypass').addEventListener('click', (e) => {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/bypass');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/bypass-rds-proxy');
         		let result = fetch(request);
         		console.log(result)	
         		e.target.textContent = 'RDS Proxy Bypassed';
@@ -353,7 +354,7 @@
         	});
         		
         	document.querySelector('.clean').addEventListener('click', (e) => {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/clean');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/reset-demo-environment');
         		let result = fetch(request);
         		console.log(result)	
         		e.target.textContent = 'Clean';
@@ -361,7 +362,7 @@
         	});
         
         	document.querySelector('.send_requests').addEventListener('click', (e) => {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/sns');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/traffic-generator');
         		let result = fetch(request);
         		console.log(result)	
         		e.target.textContent = 'Sending requests ...';
@@ -370,7 +371,7 @@
         		
         		
         	document.querySelector('.trigger_failover').addEventListener('click', (e) => {	
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/failover');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/failover');
         		let result = fetch(request);
         		console.log(result)	
         		e.target.textContent = 'Failover triggered';
@@ -379,7 +380,7 @@
         
         	function fetchEvents(){
         		async function checkEvents() {
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/events');
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/failover-events');
         			let result = await fetch(request);
         			let response = await result.text();
         			mydata = JSON.parse(response)
@@ -404,10 +405,12 @@
         					console.log($("#bypass").attr('class'))
         					
         					
-        					if ($("#bypass").attr('class').includes('disabled')){
+        					if ($("#bypass").attr('class').includes('disabled'))
+        					{
         						$("#myCarousel").carousel(3)
         					}
-        					else{
+        					else
+        					{
         						$("#myCarousel").carousel(1)
         					}
         				}
@@ -418,13 +421,16 @@
         		setInterval(checkEvents, 5000);
         	}
         
-        	function fetchRTO(){
-        		async function getRTO() {
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/rto');
+        	function fetchRTO()
+        	{
+        		async function getRTO() 
+        		{
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/rto');
         			let result = await fetch(request);
         			let response = await result.text();
         			mydata = JSON.parse(response)
-        			for (var i in mydata) {			
+        			for (var i in mydata) 
+        			{
         				$("#rto").text(mydata[i]['rto'])
         			}
         		}
@@ -432,32 +438,46 @@
         		setInterval(getRTO, 5000);
         	}
         
-        	function fetchClusterInfo(){
-        		async function getClusterInfo() {
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/cluster');
+        	function fetchClusterInfo()
+        	{
+        		async function getClusterInfo() 
+        		{
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/cluster-info');
         			let result = await fetch(request);
         			let response = await result.text();
         			
         			mydata = JSON.parse(response)
-        			for (var i in mydata) {	
-        				
+        			for (var i in mydata) 
+        			{	
         				az_data = JSON.parse(mydata[i])
-        				if (az_data['az'] == 'us-west-1a'){
-        					$("#uswest1a").text(az_data['type'])
-        					if (az_data['type'] == 'READER')					
-        						$("#uswest1a").css("color","green")
-        					else
-        						$("#uswest1a").css("color","blue")
-        						
-        				}
-        				else if (az_data['az'] == 'us-west-1b')
+        				
+        				if (az_data['az'] == primaryRegionName + 'a')
         				{
-        					$("#uswest1b").text(az_data['type'])
+        				    $('#primaryRegionZoneALabel').text(primaryRegionName)
+        					$('#primaryRegionZoneAStatus').text(az_data['type'])
         					
         					if (az_data['type'] == 'READER')
-        						$("#uswest1b").css("color","green")
+        					{
+        						$('#primaryRegionZoneAStatus').css("color","green")
+        					}
         					else
-        						$("#uswest1b").css("color","blue")
+        					{
+        						$('#primaryRegionZoneAStatus').css("color","blue")
+        					}
+        				}
+        				else if (az_data['az'] == primaryRegionName + 'b')
+        				{
+        				    $('#primaryRegionZoneBLabel').text(primaryRegionName)
+        					$('#primaryRegionZoneBStatus').text(az_data['type'])
+        					
+        					if (az_data['type'] == 'READER')
+        					{
+        						$('#primaryRegionZoneBStatus').css("color","green")
+        					}
+        					else
+        					{
+        						$('#primaryRegionZoneBStatus').css("color","blue")
+        					}
         				}
         			}
         		}
@@ -494,7 +514,7 @@
         		responsive: true,
         		title: {
         		  display: true,
-        		  text: "Requests returned by us-west-1",
+        		  text: 'Requests returned by ' + primaryRegionName,
         		},
         		legend: {
         		  display: false
@@ -511,63 +531,77 @@
         	});
         
         	var ctx_error = document.getElementById("cvsError");
-        	var myChartError = new Chart(ctx_error, {
-        	  type: 'line',
-        	  data: {
-        		labels: [],
-        		datasets: [{
-        		  data: [],
-        		  borderWidth: 1,
-        		  borderColor:'red',
-        		  label: 'liveCount',
-        		}]
-        	  },
-        	  options: {
-        		responsive: true,
-        		title: {
-        		  display: true,
-        		  text: "Errors"
-        		},
-        		legend: {
-        		  display: false
-        		},
-        		scales: {
-        		  yAxes: [{
-        			ticks: {
-        			  beginAtZero: true,
-        			  suggestedMax: 80
-        			}
-        		  }]
-        		}
-        	  }
+        	
+        	var myChartError = new Chart(ctx_error, 
+        	{
+                type: 'line',
+        	    data: 
+        	    {
+        		    labels: [],
+        		    datasets: [
+        		        {
+        		            data: [],
+        		            borderWidth: 1,
+        		            borderColor:'red',
+        		            label: 'liveCount',
+        		        }
+                    ]
+        	    },
+        	    options: 
+        	    {
+        		    responsive: true,
+        		    title: 
+        		    {
+        		        display: true,
+        		        text: "Errors"
+        		    },
+        		    legend: 
+        		    {
+        		        display: false
+        		    },
+        		    scales: 
+        		    {
+        		        yAxes: [
+                        {
+        			        ticks: 
+        			        {
+        			            beginAtZero: true,
+        			            suggestedMax: 80
+        			        }
+                        }]
+                    }
+        	    }
         	});
         
-        	function fetchwest1(){
-        		async function getdatawest1() {
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/west1');
+        	function fetch_primary_region()
+        	{
+        		async function fetch_primary_region_data() 
+        		{
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/west1');
         			let result = await fetch(request);
         			let response = await result.text();
         			
         			mydata = JSON.parse(response)
         			
-        			for (var i in mydata) {
-        				
-        				
-        				myChart.data.labels=mydata[i]['labels'].split(',')
+        			for (var i in mydata) 
+        			{
+        				myChart.data.labels = mydata[i]['labels'].split(',')
         
-        				myChart.data.datasets[0].data=mydata[i]['data'].split(',')
+        				myChart.data.datasets[0].data = mydata[i]['data'].split(',')
         				myChart.update('none')			
         			}	
         		}
         		
-        		setInterval(getdatawest1, 5000);
+        		setInterval(fetch_primary_region_data, 5000);
         	}
         
-        	fetchwest1()
+        	fetch_primary_region()
         
-        	function fetchErrors(){
-        		async function getErrors() {
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/errors');
+        	function fetchErrors()
+        	{
+        		async function getErrors()
+        		{
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/errors');
         			let result = await fetch(request);
         			let response = await result.text();
         			

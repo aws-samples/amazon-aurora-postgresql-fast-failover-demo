@@ -1,0 +1,439 @@
+Conditions:
+  IsFailoverRegion: !Not
+    - !Equals
+      - !Ref 'PrimaryRegionName'
+      - !Ref 'AWS::Region'
+  IsPrimaryRegion: !Equals
+    - !Ref 'PrimaryRegionName'
+    - !Ref 'AWS::Region'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups: []
+    ParameterLabels: {}
+  Comments: ''
+  CreatedBy: Carter Meyers (AWS)
+  Description: This application deploys a Global RDS Aurora cluster.
+  LastUpdated: November 29, 2022
+  Version: v1.0
+Outputs:
+  LoadBalancerARN:
+    Condition: ''
+    Value: !Ref 'ALB'
+  LoadBalancerFQDN:
+    Condition: ''
+    Value: !GetAtt 'ALB.DNSName'
+  Port443ALBListenerARN:
+    Condition: ''
+    Value: !Ref 'Port443ALBListener'
+Parameters:
+  CodeDownloadURL:
+    Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
+    Description: The URL from which the supporting codebase can be downloaded. This
+      codebase is used to deploy the demo dashboard.
+    Type: String
+  DBAdminPassword:
+    Description: The password to be used for the RDS Aurora admin account.
+    NoEcho: true
+    Type: String
+  DBAdminUsername:
+    Description: The username to be used for the RDS Aurora admin account.
+    Type: String
+  FailoverFailoverDatabaseSubnetCIDR:
+    Default: 10.10.13.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  FailoverFailoverPrivateSubnetCIDR:
+    Default: 10.10.12.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  FailoverFailoverPublicSubnetCIDR:
+    Default: 10.10.11.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  FailoverKMSKeyID:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  FailoverLambdaLayerARN:
+    Type: String
+  FailoverPrimaryDatabaseSubnetCIDR:
+    Default: 10.10.10.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  FailoverPrimaryPrivateSubnetCIDR:
+    Default: 10.10.9.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  FailoverPrimaryPublicSubnetCIDR:
+    Default: 10.10.8.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  FailoverRegionName:
+    Description: The name of the failover region (e.g., us-east-1)
+    Type: String
+  FailoverVPCCIDR:
+    Default: 10.10.8.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  MainStackName:
+    Type: String
+  PrimaryFailoverDatabaseSubnetCIDR:
+    Default: 10.10.5.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  PrimaryFailoverPrivateSubnetCIDR:
+    Default: 10.10.4.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  PrimaryFailoverPublicSubnetCIDR:
+    Default: 10.10.3.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  PrimaryKMSKeyID:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  PrimaryLambdaLayerARN:
+    Type: String
+  PrimaryPrimaryDatabaseSubnetCIDR:
+    Default: 10.10.2.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  PrimaryPrimaryPrivateSubnetCIDR:
+    Default: 10.10.1.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  PrimaryPrimaryPublicSubnetCIDR:
+    Default: 10.10.0.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  PrimaryRegionName:
+    Description: The name of the primary region (e.g., us-east-1)
+    Type: String
+  PrimaryVPCCIDR:
+    Default: 10.10.0.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  PrivateHostedZoneID:
+    Type: String
+  PublicFQDN:
+    Description: The FQDN to be used by this application. An Amazon ACM Certificate
+      will be issued for this FQDN.
+    Type: String
+  PublicHostedZoneID:
+    Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+    Type: String
+Resources:
+  ALB:
+    DependsOn:
+      - ALBSecurityGroup
+    Properties:
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref 'ALBSecurityGroup'
+      Subnets:
+        - !Join
+          - ''
+          - - '{{resolve:ssm:/'
+            - !Ref 'MainStackName'
+            - /PrimaryPublicSubnetID}}
+        - !Join
+          - ''
+          - - '{{resolve:ssm:/'
+            - !Ref 'MainStackName'
+            - /FailoverPublicSubnetID}}
+      Type: application
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  ALBSecurityGroup:
+    Properties:
+      GroupDescription: ALB Security Group
+      SecurityGroupEgress: []
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          Description: IPv4 HTTP Access from Internet
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: '0.0.0.0/0'
+          Description: IPv4 HTTP Access from Internet
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+      VpcId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /VPCID}}
+    Type: AWS::EC2::SecurityGroup
+  Certificate:
+    Properties:
+      DomainName: !Ref 'PublicFQDN'
+      DomainValidationOptions:
+        - DomainName: !Ref 'PublicFQDN'
+          HostedZoneId: !Ref 'PublicHostedZoneID'
+      ValidationMethod: DNS
+    Type: AWS::CertificateManager::Certificate
+  DNSRecord:
+    Condition: IsPrimaryRegion
+    DependsOn:
+      - ALB
+    Properties:
+      HostedZoneId: !Ref 'PublicHostedZoneID'
+      RecordSets:
+        - AliasTarget:
+            DNSName: !GetAtt 'ALB.DNSName'
+            EvaluateTargetHealth: false
+            HostedZoneId: !GetAtt 'ALB.CanonicalHostedZoneID'
+          Name: !Ref 'PublicFQDN'
+          Type: A
+    Type: AWS::Route53::RecordSetGroup
+  DemoSite:
+    DependsOn:
+      - DemoSiteRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
+          import boto3\nimport datetime\nimport psycopg2\nimport dateutil.tz\nfrom\
+          \ botocore.exceptions import ClientError as boto3_client_error\n\ndef get_region(context):\n\
+          \    return context.invoked_function_arn.split(':')[3]\n\ndef get_rds_credentials():\n\
+          \    \n    secrets_manager_client = boto3.client('secretsmanager')\n\n \
+          \   try:\n        \n        get_secret_value_response = secrets_manager_client.get_secret_value(\n\
+          \            SecretId = os.environ['REGIONAL_RDS_SECRET_ARN']\n        )\n\
+          \        \n    except boto3_client_error as e:\n        raise Exception('Failed\
+          \ to Retrieve RDS Secret: ' + str(e))\n        \n    else:\n        return\
+          \ json.loads(get_secret_value_response['SecretString'])\n        \ndef lambda_handler(event,\
+          \ context):\n    \n    print(json.dumps(event))\n    \n    http_status_code\
+          \ = 200\n    \n    try: \n        \n        guid = event['queryStringParameters']['guid']\n\
+          \n        eastern = dateutil.tz.gettz('US/Eastern')\n\n        sql_statement\
+          \ = \"INSERT INTO dataserver (guid,insertedon) VALUES ('\" + str(guid) +\
+          \ \"','\" + datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\"\
+          ) + \"') RETURNING id\"\n        \n        rds_secret = get_rds_credentials()\n\
+          \        \n        db_conn = psycopg2.connect(\n            host = os.environ['GLOBAL_DB_WRITER_ENDPOINT'],\n\
+          \            port = rds_secret['port'],\n            user = rds_secret['username'],\n\
+          \            password = rds_secret['password'],\n            database =\
+          \ rds_secret['database'],\n            connect_timeout = 3,\n          \
+          \  sslmode = 'require',\n        )\n        \n        id = 0\n        http_status_code\
+          \ = 200\n        curs = db_conn.cursor()\n        curs.execute(sql_statement)\n\
+          \        id = curs.fetchone()[0]\n        print(id)\n        db_conn.commit()\n\
+          \        curs.close()\n        db_conn.close()\n        \n    except Exception\
+          \ as e:\n        http_status_code = 500\n        print(e)\n        \n  \
+          \  return {\n        'statusCode': http_status_code,\n        'headers':\
+          \ {'content-type': 'text/html'},\n        'body': 'You\\'ve reached the\
+          \ <strong>' + get_region(context) + '</strong> site!'\n    }"
+      Description: ''
+      Environment:
+        Variables:
+          GLOBAL_DB_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RDSGlobalWriterDNSEndpoint}}
+          REGIONAL_RDS_SECRET_ARN: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RDSAdminSecretARN}}
+      Handler: index.lambda_handler
+      Layers:
+        - !If
+          - IsPrimaryRegion
+          - !Ref 'PrimaryLambdaLayerARN'
+          - !Ref 'FailoverLambdaLayerARN'
+      MemorySize: 128
+      Role: !GetAtt 'DemoSiteRole.Arn'
+      Runtime: python3.9
+      Timeout: 15
+      TracingConfig:
+        Mode: PassThrough
+      VpcConfig:
+        SecurityGroupIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /LambdaSecurityGroupID}}
+        SubnetIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrimaryPrivateSubnetID}}
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /FailoverPrivateSubnetID}}
+    Type: AWS::Lambda::Function
+  DemoSiteLogGroup:
+    DeletionPolicy: Retain
+    DependsOn:
+      - DemoSite
+    Properties:
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'DemoSite'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  DemoSiteRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - rds-db:Connect
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RDSProxyARN}}
+                Sid: ConnectToRDSProxy
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RDSAdminSecretARN}}
+                Sid: GetRDSAdminSecret
+              - Action:
+                  - kms:Decrypt
+                Effect: Allow
+                Resource:
+                  - !If
+                    - IsPrimaryRegion
+                    - !Ref 'PrimaryKMSKeyID'
+                    - !Ref 'FailoverKMSKeyID'
+                Sid: DecryptWithKMS
+          PolicyName: database-secret-retrieval
+    Type: AWS::IAM::Role
+  DemoSiteTargetGroup:
+    DependsOn:
+      - DemoSite
+    Properties:
+      HealthCheckEnabled: false
+      Matcher:
+        HttpCode: '200'
+      TargetType: lambda
+      Targets:
+        - Id: !GetAtt 'DemoSite.Arn'
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  DemoSiteTargetGroupPermission:
+    DependsOn:
+      - DemoSite
+      - DemoSiteTargetGroup
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref 'DemoSite'
+      Principal: elasticloadbalancing.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Ref 'DemoSiteTargetGroup'
+    Type: AWS::Lambda::Permission
+  LoadBalancerARNParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'ALB ARN for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - LoadBalancerARN
+      Tier: Standard
+      Type: String
+      Value: !Ref 'ALB'
+    Type: AWS::SSM::Parameter
+  LoadBalancerFQDNParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'ALB FQDN for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - LoadBalancerFQDN
+      Tier: Standard
+      Type: String
+      Value: !GetAtt 'ALB.DNSName'
+    Type: AWS::SSM::Parameter
+  Port443ALBListener:
+    DependsOn:
+      - DemoSiteTargetGroup
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref 'Certificate'
+      DefaultActions:
+        - TargetGroupArn: !Ref 'DemoSiteTargetGroup'
+          Type: forward
+      LoadBalancerArn: !Ref 'ALB'
+      Port: 443
+      Protocol: HTTPS
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  Port443ALBListenerARNParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'ALB ARN for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - Port443ALBListenerARN
+      Tier: Standard
+      Type: String
+      Value: !Ref 'Port443ALBListener'
+    Type: AWS::SSM::Parameter
+  Port80ALBListener:
+    DependsOn:
+      - ALB
+    Properties:
+      DefaultActions:
+        - RedirectConfig:
+            Host: '#{host}'
+            Path: /#{path}
+            Port: '443'
+            Protocol: HTTPS
+            Query: '#{query}'
+            StatusCode: HTTP_301
+          Type: redirect
+      LoadBalancerArn: !Ref 'ALB'
+      Port: 80
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener

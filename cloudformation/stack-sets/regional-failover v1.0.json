@@ -1,0 +1,1536 @@
+{
+ "Conditions": {
+  "IsFailoverRegion": {
+   "Fn::Not": [
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "PrimaryRegionName"
+      },
+      {
+       "Ref": "AWS::Region"
+      }
+     ]
+    }
+   ]
+  },
+  "IsPrimaryRegion": {
+   "Fn::Equals": [
+    {
+     "Ref": "PrimaryRegionName"
+    },
+    {
+     "Ref": "AWS::Region"
+    }
+   ]
+  }
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [],
+   "ParameterLabels": {}
+  },
+  "Comments": "",
+  "CreatedBy": "Carter Meyers (AWS)",
+  "Description": "This application deploys a Global RDS Aurora cluster.",
+  "LastUpdated": "November 29, 2022",
+  "Version": "v1.0"
+ },
+ "Parameters": {
+  "CodeDownloadURL": {
+   "Default": "https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main",
+   "Description": "The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.",
+   "Type": "String"
+  },
+  "DBAdminPassword": {
+   "Description": "The password to be used for the RDS Aurora admin account.",
+   "NoEcho": true,
+   "Type": "String"
+  },
+  "DBAdminUsername": {
+   "Description": "The username to be used for the RDS Aurora admin account.",
+   "Type": "String"
+  },
+  "FailoverFailoverDatabaseSubnetCIDR": {
+   "Default": "10.10.13.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "FailoverFailoverPrivateSubnetCIDR": {
+   "Default": "10.10.12.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "FailoverFailoverPublicSubnetCIDR": {
+   "Default": "10.10.11.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "FailoverKMSKeyID": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "FailoverLambdaLayerARN": {
+   "Type": "String"
+  },
+  "FailoverPrimaryDatabaseSubnetCIDR": {
+   "Default": "10.10.10.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "FailoverPrimaryPrivateSubnetCIDR": {
+   "Default": "10.10.9.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "FailoverPrimaryPublicSubnetCIDR": {
+   "Default": "10.10.8.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "FailoverRegionName": {
+   "Description": "The name of the failover region (e.g., us-east-1)",
+   "Type": "String"
+  },
+  "FailoverVPCCIDR": {
+   "Default": "10.10.8.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "MainStackName": {
+   "Type": "String"
+  },
+  "PrimaryFailoverDatabaseSubnetCIDR": {
+   "Default": "10.10.5.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "PrimaryFailoverPrivateSubnetCIDR": {
+   "Default": "10.10.4.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "PrimaryFailoverPublicSubnetCIDR": {
+   "Default": "10.10.3.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "PrimaryKMSKeyID": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "PrimaryLambdaLayerARN": {
+   "Type": "String"
+  },
+  "PrimaryPrimaryDatabaseSubnetCIDR": {
+   "Default": "10.10.2.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrimaryPrivateSubnetCIDR": {
+   "Default": "10.10.1.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrimaryPublicSubnetCIDR": {
+   "Default": "10.10.0.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "PrimaryRegionName": {
+   "Description": "The name of the primary region (e.g., us-east-1)",
+   "Type": "String"
+  },
+  "PrimaryVPCCIDR": {
+   "Default": "10.10.0.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "PrivateHostedZoneID": {
+   "Type": "String"
+  },
+  "PublicFQDN": {
+   "Description": "The FQDN to be used by this application. An Amazon ACM Certificate will be issued for this FQDN.",
+   "Type": "String"
+  },
+  "PublicHostedZoneID": {
+   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Type": "String"
+  }
+ },
+ "Resources": {
+  "Canary": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "CanaryRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport time\nimport json\nimport boto3\nimport psycopg2\nimport dateutil.tz\nfrom datetime import datetime\nfrom datetime import timedelta\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ndef get_rds_credentials():\n    \n    secrets_manager_client = boto3.client('secretsmanager')\n\n    try:\n        \n        get_secret_value_response = secrets_manager_client.get_secret_value(\n            SecretId = os.environ['RDS_ADMIN_SECRET_ARN']\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Retrieve RDS Secret: ' + str(e))\n        \n    else:\n        return json.loads(get_secret_value_response['SecretString'])\n\nrds_secret = get_rds_credentials()\n\ndb_conn = psycopg2.connect(\n    host = rds_secret['host'],\n    port = rds_secret['port'],\n    user = rds_secret['username'],\n    sslmode = 'require',\n    password = rds_secret['password'],\n    database = rds_secret['database'],\n    connect_timeout = 3,\n)\n\ndef test_db_connection():\n\n    with db_conn:\n        with db_conn.cursor() as curs:\n            curs.execute('SELECT NOW()')\n            results = curs.fetchall()\n            db_conn.commit()\n            \ndef disable_canary_rule():\n\n    try:\n        \n        boto3.client('events').disable_rule(\n            Name = os.environ['CANARY_CRON_NAME']\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Disable Canary Cron: ' + str(e))\n        \n    return True\n\ndef detach_and_promote_failover_cluster():\n    \n    try:\n        \n        boto3.client('rds').remove_from_global_cluster(\n            DbClusterIdentifier = os.environ['FAILOVER_CLUSTER_ARN'],\n            GlobalClusterIdentifier = os.environ['GLOBAL_CLUSTER_IDENTIFIER'],\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Detach Failover Cluster from Primary: ' + str(e))\n    \n    return True\n    \ndef log_failover_event():\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n    \n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (2,'\"+ datetime.now(tz=eastern).strftime(\"%m/%d/%Y %H:%M:%S\")+\"' )\")\n    db_conn.commit()\n    curs.close()\n    db_conn.close()\n   \ndef lambda_handler(event, context):\n    \n    statusCode = 200\n    \n    now = datetime.now()\n    end = now + timedelta(seconds = 110)\n    failures = 0\n    \n    while (datetime.now() < end):\n        \n        try:\n            test_db_connection()\n            \n        except Exception as e:\n            failures += 1\n        \n        if failures > 1:\n            \n            detach_and_promote_failover_cluster()\n            print('Detached and Promoted Failover Cluster');\n            \n            disable_canary_rule()\n            print('Canary Rule Disabled');\n            \n            log_failover_event()\n            print('Failover Event Logged');\n            \n            return {\n                'statusCode': 500\n            }\n            \n        time.sleep(10)\n    \n    return {\n        'statusCode': statusCode\n    }"
+    },
+    "Description": "",
+    "Environment": {
+     "Variables": {
+      "CANARY_CRON_NAME": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Ref": "MainStackName"
+         },
+         "-canary"
+        ]
+       ]
+      },
+      "FAILOVER_CLUSTER_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSRegionalClusterARN}}"
+        ]
+       ]
+      },
+      "GLOBAL_CLUSTER_IDENTIFIER": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSGlobalClusterIdentifier}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::If": [
+       "IsPrimaryRegion",
+       {
+        "Ref": "PrimaryLambdaLayerARN"
+       },
+       {
+        "Ref": "FailoverLambdaLayerARN"
+       }
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "CanaryRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 65,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "CanaryCron": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "Canary"
+   ],
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Invokes Regional DB Canary."
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "-canary"
+      ]
+     ]
+    },
+    "ScheduleExpression": "rate(1 minute)",
+    "State": "DISABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "Canary",
+        "Arn"
+       ]
+      },
+      "Id": "Canary"
+     }
+    ]
+   },
+   "Type": "AWS::Events::Rule"
+  },
+  "CanaryCronPermission": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "Canary",
+    "CanaryCron"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Ref": "Canary"
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "CanaryCron",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "CanaryLogGroup": {
+   "Condition": "IsFailoverRegion",
+   "DeletionPolicy": "Retain",
+   "DependsOn": [
+    "Canary"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "Canary"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "CanaryRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "rds-db:Connect"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSProxyARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "ConnectToRDSProxy"
+        },
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSAdminSecretARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKMSKeyID"
+            },
+            {
+             "Ref": "FailoverKMSKeyID"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        },
+        {
+         "Action": [
+          "rds:RemoveFromGlobalCluster"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:",
+             {
+              "Ref": "AWS::Partition"
+             },
+             ":rds:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":cluster:",
+             {
+              "Fn::Join": [
+               "",
+               [
+                "{{resolve:ssm:/",
+                {
+                 "Ref": "MainStackName"
+                },
+                "/RDSRegionalClusterIdentifier}}"
+               ]
+              ]
+             }
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:",
+             {
+              "Ref": "AWS::Partition"
+             },
+             ":rds:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":global-cluster:",
+             {
+              "Fn::Join": [
+               "",
+               [
+                "{{resolve:ssm:/",
+                {
+                 "Ref": "MainStackName"
+                },
+                "/RDSGlobalClusterIdentifier}}"
+               ]
+              ]
+             }
+            ]
+           ]
+          }
+         ],
+         "Sid": "DetachFailoverCluster"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "CanaryRoleEventBridgePolicy": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "CanaryRole",
+    "CanaryCron"
+   ],
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "events:DisableRule"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "CanaryCron",
+          "Arn"
+         ]
+        }
+       ],
+       "Sid": "DisableEventBridgeRule"
+      }
+     ]
+    },
+    "PolicyName": "event-bridge-policy",
+    "Roles": [
+     {
+      "Ref": "CanaryRole"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Policy"
+  },
+  "FailoverCompletedEventListener": {
+   "DependsOn": [
+    "FailoverCompletedHandler"
+   ],
+   "Properties": {
+    "Description": "Invokes handler when failover is completed",
+    "EventPattern": {
+     "detail": {
+      "EventID": [
+       "RDS-EVENT-0071"
+      ],
+      "SourceArn": [
+       {
+        "Fn::Join": [
+         "",
+         [
+          "{{resolve:ssm:/",
+          {
+           "Ref": "MainStackName"
+          },
+          "/RDSRegionalClusterARN}}"
+         ]
+        ]
+       }
+      ]
+     },
+     "detail-type": [
+      "RDS DB Cluster Event"
+     ],
+     "source": [
+      "aws.rds"
+     ]
+    },
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "FailoverCompletedHandler",
+        "Arn"
+       ]
+      },
+      "Id": "FailoverCompletedHandler"
+     }
+    ]
+   },
+   "Type": "AWS::Events::Rule"
+  },
+  "FailoverCompletedHandler": {
+   "DependsOn": [
+    "FailoverCompletedHandlerRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport dateutil.tz\nfrom datetime import datetime\nfrom datetime import timedelta\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ndef get_region(context):\n    return context.invoked_function_arn.split(':')[3]\n\ndef get_rds_credentials():\n    \n    secrets_manager_client = boto3.client('secretsmanager')\n\n    try:\n        \n        get_secret_value_response = secrets_manager_client.get_secret_value(\n            SecretId = os.environ['RDS_ADMIN_SECRET_ARN']\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Retrieve RDS Secret: ' + str(e))\n        \n    else:\n        return json.loads(get_secret_value_response['SecretString'])\n        \ndef lambda_handler(event, context):\n    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n    \n    rds_secret = get_rds_credentials()\n\n    db_conn = psycopg2.connect(\n        host = rds_secret['host'],\n        port = rds_secret['port'],\n        user = rds_secret['username'],\n        password = rds_secret['password'],\n        database = rds_secret['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n    \n    current_region = get_region(context)\n    \n    if current_region == os.environ['PRIMARY_REGION_NAME']:\n        \n        curs = db_conn.cursor()\n        curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (3,'\"+datetime.now(tz=eastern).strftime(\"%m/%d/%Y %H:%M:%S\")+\"' )\")\n        db_conn.commit()\n        \n    elif current_region == os.environ['FAILOVER_REGION_NAME']:\n        \n        r53_client = boto3.client('route53')\n        \n        dns_changes = [\n            {\n                'fqdn': os.environ['PUBLIC_FQDN'],\n                'newValue': '',\n                'hostedZoneId': os.environ['PUBLIC_HOSTED_ZONE_ID']\n            },\n            {\n                'fqdn': 'db.writer.' + os.environ['PUBLIC_FQDN'],\n                'newValue': os.environ['RDS_REGIONAL_WRITER_ENDPOINT'],\n                'hostedZoneId': os.environ['PRIVATE_HOSTED_ZONE_ID'],\n            },\n            {\n                'fqdn': 'db.reader.' + os.environ['PUBLIC_FQDN'],\n                'newValue': os.environ['RDS_REGIONAL_READER_ENDPOINT'],\n                'hostedZoneId': os.environ['PRIVATE_HOSTED_ZONE_ID'],\n            }\n        ]\n        \n        for dns_change in dns_changes:\n            \n            r53_client.change_resource_record_sets(\n                ChangeBatch = {\n                    'Changes': [\n                        {\n                            'Action': 'UPSERT',\n                            'ResourceRecordSet': {\n                                'Name': dns_change['fqdn'],\n                                'ResourceRecords': [\n                                    {\n                                        'Value': dns_change['newValue'],\n                                    },\n                                ],\n                                'TTL': 1,\n                                'Type': 'CNAME',\n                            },\n                        },\n                    ],\n                },\n                HostedZoneId = dns_change['hostedZoneId'],\n            )\n      \n     \n      \n    '''\n        Logs Failover Completion\n    '''\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (3,'\" + datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    '''\n        Logs CNAME Update\n    '''\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (4,'\" + datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n        \n    curs.close()\n    db_conn.close()\n    \n    return True"
+    },
+    "Description": "Processes failover completed events",
+    "Environment": {
+     "Variables": {
+      "PRIVATE_HOSTED_ZONE_ID": {
+       "Ref": "PrivateHostedZoneID"
+      },
+      "PUBLIC_FQDN": {
+       "Ref": "PublicFQDN"
+      },
+      "PUBLIC_HOSTED_ZONE_ID": {
+       "Ref": "PublicHostedZoneID"
+      },
+      "RDS_ADMIN_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSAdminSecretARN}}"
+        ]
+       ]
+      },
+      "RDS_PROXY_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSProxyWriterEndpoint}}"
+        ]
+       ]
+      },
+      "RDS_REGIONAL_READER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSClusterReaderEndpoint}}"
+        ]
+       ]
+      },
+      "RDS_REGIONAL_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSClusterWriterEndpoint}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.lambda_handler",
+    "Layers": [
+     {
+      "Fn::If": [
+       "IsPrimaryRegion",
+       {
+        "Ref": "PrimaryLambdaLayerARN"
+       },
+       {
+        "Ref": "FailoverLambdaLayerARN"
+       }
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "FailoverCompletedHandlerRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 15,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupID}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrimaryPrivateSubnetID}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/FailoverPrivateSubnetID}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "FailoverCompletedHandlerLogGroup": {
+   "DeletionPolicy": "Retain",
+   "DependsOn": [
+    "FailoverCompletedHandler"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "FailoverCompletedHandler"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "FailoverCompletedHandlerPermission": {
+   "DependsOn": [
+    "FailoverCompletedHandler",
+    "FailoverCompletedEventListener"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Ref": "FailoverCompletedHandler"
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "FailoverCompletedEventListener",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "FailoverCompletedHandlerRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "rds-db:Connect"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSProxyARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "ConnectToRDSProxy"
+        },
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSAdminSecretARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKMSKeyID"
+            },
+            {
+             "Ref": "FailoverKMSKeyID"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "FailoverStartedEventListener": {
+   "DependsOn": [
+    "FailoverStartedHandler"
+   ],
+   "Properties": {
+    "Description": "Invokes handler when failover is started",
+    "EventPattern": {
+     "detail": {
+      "EventID": [
+       "RDS-EVENT-0073"
+      ],
+      "SourceArn": [
+       {
+        "Fn::Join": [
+         "",
+         [
+          "{{resolve:ssm:/",
+          {
+           "Ref": "MainStackName"
+          },
+          "/RDSRegionalClusterARN}}"
+         ]
+        ]
+       }
+      ]
+     },
+     "detail-type": [
+      "RDS DB Cluster Event"
+     ],
+     "source": [
+      "aws.rds"
+     ]
+    },
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "FailoverStartedHandler",
+        "Arn"
+       ]
+      },
+      "Id": "FailoverStartedHandler"
+     }
+    ]
+   },
+   "Type": "AWS::Events::Rule"
+  },
+  "FailoverStartedHandler": {
+   "DependsOn": [
+    "FailoverStartedHandlerRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ndef get_region(context):\n    return context.invoked_function_arn.split(':')[3]\n\ndef get_rds_credentials():\n    \n    secrets_manager_client = boto3.client('secretsmanager')\n\n    try:\n        \n        get_secret_value_response = secrets_manager_client.get_secret_value(\n            SecretId = os.environ['RDS_ADMIN_SECRET_ARN']\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Retrieve RDS Secret: ' + str(e))\n        \n    else:\n        return json.loads(get_secret_value_response['SecretString'])\n        \ndef lambda_handler(event, context):\n    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n    \n    rds_secret = get_rds_credentials()\n\n    db_conn = psycopg2.connect(\n        host = rds_secret['host'],\n        port = rds_secret['port'],\n        user = rds_secret['username'],\n        password = rds_secret['password'],\n        database = rds_secret['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (2,'\"+datetime.datetime.now(tz=eastern).strftime(\"%m/%d/%Y %H:%M:%S\")+\"' )\")\n    db_conn.commit()\n    curs.close()\n    db_conn.close()\n    \n    return {\n        'statusCode': 200,\n        'body': json.dumps('Hello from Lambda!')\n    }\n"
+    },
+    "Description": "Processes failover started events",
+    "Environment": {
+     "Variables": {
+      "PRIVATE_HOSTED_ZONE_ID": {
+       "Ref": "PrivateHostedZoneID"
+      },
+      "PUBLIC_FQDN": {
+       "Ref": "PublicFQDN"
+      },
+      "PUBLIC_HOSTED_ZONE_ID": {
+       "Ref": "PublicHostedZoneID"
+      },
+      "RDS_ADMIN_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSAdminSecretARN}}"
+        ]
+       ]
+      },
+      "RDS_PROXY_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSProxyWriterEndpoint}}"
+        ]
+       ]
+      },
+      "RDS_REGIONAL_READER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSClusterReaderEndpoint}}"
+        ]
+       ]
+      },
+      "RDS_REGIONAL_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RDSClusterWriterEndpoint}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.lambda_handler",
+    "Layers": [
+     {
+      "Fn::If": [
+       "IsPrimaryRegion",
+       {
+        "Ref": "PrimaryLambdaLayerARN"
+       },
+       {
+        "Ref": "FailoverLambdaLayerARN"
+       }
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "FailoverStartedHandlerRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 15,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupID}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrimaryPrivateSubnetID}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/FailoverPrivateSubnetID}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "FailoverStartedHandlerLogGroup": {
+   "DeletionPolicy": "Retain",
+   "DependsOn": [
+    "FailoverStartedHandler"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "FailoverStartedHandler"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "FailoverStartedHandlerPermission": {
+   "DependsOn": [
+    "FailoverStartedHandler",
+    "FailoverStartedEventListener"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Ref": "FailoverStartedHandler"
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "FailoverStartedEventListener",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "FailoverStartedHandlerRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "rds-db:Connect"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSProxyARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "ConnectToRDSProxy"
+        },
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSAdminSecretARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKMSKeyID"
+            },
+            {
+             "Ref": "FailoverKMSKeyID"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "RDSProxyMonitor": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "RDSProxyMonitorRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "_A=True\nimport sys\nsys.path.append('/opt')\nimport os,json,time,boto3,psycopg2,dateutil.tz\nfrom datetime import datetime,timedelta\nfrom botocore.exceptions import ClientError as boto3_client_error\nrds_client=boto3.client('rds')\ndef get_rds_credentials():\n\tA=boto3.client('secretsmanager')\n\ttry:B=A.get_secret_value(SecretId=os.environ['RDS_ADMIN_SECRET_ARN'])\n\texcept boto3_client_error as C:raise Exception('Failed to Retrieve RDS Secret: '+str(C))\n\telse:return json.loads(B['SecretString'])\ndef change_db_cnames_to_rds_proxy():\n\tI='PRIVATE_HOSTED_ZONE_ID';H='PUBLIC_FQDN';G='comment';D='hostedZoneId';C='newValue';B='fqdn';E=boto3.client('route53');F=[{B:'db.writer.'+os.environ[H],G:\"Points the Internal DB Writer Endpoint Back to the RDS Proxy's Writer\",C:os.environ['RDS_REGIONAL_WRITER_ENDPOINT'],D:os.environ[I]},{B:'db.reader.'+os.environ[H],G:\"Points the Internal DB Reader Endpoint Back to the RDS Proxy's Writer\",C:os.environ['RDS_REGIONAL_READER_ENDPOINT'],D:os.environ[I]}]\n\tfor A in F:E.change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':A[B],'ResourceRecords':[{'Value':A[C]}],'TTL':1,'Type':'CNAME'}}]},HostedZoneId=A[D])\n\treturn _A\ndef disable_proxy_monitor_cron():\n\ttry:boto3.client('events').disable_rule(Name=os.environ['PROXY_MONITOR_CRON_NAME'])\n\texcept boto3_client_error as A:raise Exception('Failed to Disable Proxy Monitor Cron: '+str(A))\n\treturn _A\ndef is_rds_proxy_target_available():\n\ttry:A=rds_client.describe_db_proxy_targets(DBProxyName=os.environ['REGIONAL_RDS_PROXY_NAME'],TargetGroupName='default')\n\texcept boto3_client_error as B:raise Exception('Failed to Retrieve RDS Proxy Targets: '+str(B))\n\tprint(A)\n\tif\"'State': 'AVAILABLE'\"in str(A):return _A\n\telse:return False\ndef log_event():D=dateutil.tz.gettz('US/Eastern');A=get_rds_credentials();B=psycopg2.connect(host=A['host'],port=A['port'],user=A['username'],sslmode='require',password=A['password'],database=A['database'],connect_timeout=3);C=B.cursor();C.execute(\"INSERT INTO failoverevents (event,insertedon) values (5,'\"+datetime.now(tz=D).strftime('%m/%d/%Y %H:%M:%S')+\"' )\");B.commit();C.close();B.close()\ndef lambda_handler(event,context):\n\tA=datetime.now();B=A+timedelta(seconds=50)\n\twhile datetime.now()<B:\n\t\ttry:\n\t\t\tif is_rds_proxy_target_available():print('Target is Registered and Available');log_event();disable_proxy_monitor_cron();change_db_cnames_to_rds_proxy();break\n\t\t\telse:print('Target is NOT Registered and Available')\n\t\texcept Exception as C:time.sleep(10)"
+    },
+    "Description": "",
+    "Environment": {
+     "Variables": {
+      "PRIVATE_HOSTED_ZONE_ID": {
+       "Ref": "PrivateHostedZoneID"
+      },
+      "PROXY_MONITOR_CRON_NAME": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Ref": "MainStackName"
+         },
+         "-proxy-monitor"
+        ]
+       ]
+      },
+      "REGIONAL_RDS_PROXY_NAME": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/",
+         "RDSProxyName}}"
+        ]
+       ]
+      },
+      "REGIONAL_RDS_PROXY_READER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/",
+         "RDSProxyReaderEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_RDS_PROXY_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/",
+         "RDSProxyWriterEndpoint}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::If": [
+       "IsPrimaryRegion",
+       {
+        "Ref": "PrimaryLambdaLayerARN"
+       },
+       {
+        "Ref": "FailoverLambdaLayerARN"
+       }
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "RDSProxyMonitorRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 120,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "RDSProxyMonitorCron": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "RDSProxyMonitor"
+   ],
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Invokes the RDS Proxy Monitor"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "-proxy-monitor"
+      ]
+     ]
+    },
+    "ScheduleExpression": "rate(1 minute)",
+    "State": "DISABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "RDSProxyMonitor",
+        "Arn"
+       ]
+      },
+      "Id": "RDSProxyMonitor"
+     }
+    ]
+   },
+   "Type": "AWS::Events::Rule"
+  },
+  "RDSProxyMonitorCronPermission": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "RDSProxyMonitor",
+    "RDSProxyMonitorCron"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Ref": "RDSProxyMonitor"
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "RDSProxyMonitorCron",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "RDSProxyMonitorLogGroup": {
+   "Condition": "IsFailoverRegion",
+   "DeletionPolicy": "Retain",
+   "DependsOn": [
+    "RDSProxyMonitor"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "RDSProxyMonitor"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "RDSProxyMonitorRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "rds-db:Connect"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSProxyARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "ConnectToRDSProxy"
+        },
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RDSAdminSecretARN}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKMSKeyID"
+            },
+            {
+             "Ref": "FailoverKMSKeyID"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        },
+        {
+         "Action": [
+          "rds:DescribeDBProxyTargets"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          "*"
+         ],
+         "Sid": "DescribeDBProxyTargets"
+        },
+        {
+         "Action": [
+          "route53:ChangeResourceRecordSets"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:route53:::hostedzone/",
+             {
+              "Ref": "PrivateHostedZoneID"
+             }
+            ]
+           ]
+          }
+         ],
+         "Sid": "SendMessagesToSNS"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "RDSProxyMonitorRoleEventBridgePolicy": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "RDSProxyMonitorRole",
+    "RDSProxyMonitorCron"
+   ],
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "events:DisableRule"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "RDSProxyMonitorCron",
+          "Arn"
+         ]
+        }
+       ],
+       "Sid": "DisableEventBridgeRule"
+      }
+     ]
+    },
+    "PolicyName": "event-bridge-policy",
+    "Roles": [
+     {
+      "Ref": "RDSProxyMonitorRole"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Policy"
+  }
+ }
+}

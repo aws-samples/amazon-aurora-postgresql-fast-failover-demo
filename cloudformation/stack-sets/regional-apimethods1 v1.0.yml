@@ -1,0 +1,1035 @@
+Conditions:
+  IsFailoverRegion: !Not
+    - !Equals
+      - !Ref 'PrimaryRegionName'
+      - !Ref 'AWS::Region'
+  IsPrimaryRegion: !Equals
+    - !Ref 'PrimaryRegionName'
+    - !Ref 'AWS::Region'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups: []
+    ParameterLabels: {}
+  Comments: ''
+  CreatedBy: Carter Meyers (AWS)
+  Description: This application deploys a Global RDS Aurora cluster.
+  LastUpdated: November 29, 2022
+  Version: v1.0
+Parameters:
+  CodeDownloadURL:
+    Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
+    Description: The URL from which the supporting codebase can be downloaded. This
+      codebase is used to deploy the demo dashboard.
+    Type: String
+  DBAdminPassword:
+    Description: The password to be used for the RDS Aurora admin account.
+    NoEcho: true
+    Type: String
+  DBAdminUsername:
+    Description: The username to be used for the RDS Aurora admin account.
+    Type: String
+  FailoverFailoverDatabaseSubnetCIDR:
+    Default: 10.10.13.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  FailoverFailoverPrivateSubnetCIDR:
+    Default: 10.10.12.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  FailoverFailoverPublicSubnetCIDR:
+    Default: 10.10.11.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  FailoverKMSKeyID:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  FailoverLambdaLayerARN:
+    Type: String
+  FailoverPrimaryDatabaseSubnetCIDR:
+    Default: 10.10.10.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  FailoverPrimaryPrivateSubnetCIDR:
+    Default: 10.10.9.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  FailoverPrimaryPublicSubnetCIDR:
+    Default: 10.10.8.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  FailoverRegionName:
+    Description: The name of the failover region (e.g., us-east-1)
+    Type: String
+  FailoverVPCCIDR:
+    Default: 10.10.8.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  MainStackName:
+    Type: String
+  PrimaryFailoverDatabaseSubnetCIDR:
+    Default: 10.10.5.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  PrimaryFailoverPrivateSubnetCIDR:
+    Default: 10.10.4.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  PrimaryFailoverPublicSubnetCIDR:
+    Default: 10.10.3.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  PrimaryKMSKeyID:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  PrimaryLambdaLayerARN:
+    Type: String
+  PrimaryPrimaryDatabaseSubnetCIDR:
+    Default: 10.10.2.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  PrimaryPrimaryPrivateSubnetCIDR:
+    Default: 10.10.1.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  PrimaryPrimaryPublicSubnetCIDR:
+    Default: 10.10.0.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  PrimaryRegionName:
+    Description: The name of the primary region (e.g., us-east-1)
+    Type: String
+  PrimaryVPCCIDR:
+    Default: 10.10.0.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  PrivateHostedZoneID:
+    Type: String
+  PublicFQDN:
+    Description: The FQDN to be used by this application. An Amazon ACM Certificate
+      will be issued for this FQDN.
+    Type: String
+  PublicHostedZoneID:
+    Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+    Type: String
+Resources:
+  ClusterInfoResource:
+    Condition: ''
+    DependsOn: []
+    Properties:
+      ParentId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIRootResourceID}}
+      PathPart: cluster-info
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Resource
+  ClusterInfoResourceOptionsMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'''
+              method.response.header.Access-Control-Allow-Methods: '''GET,POST,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: '{}'
+            StatusCode: '200'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      ResourceId: !Ref 'ClusterInfoResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Method
+  FailoverEventsResource:
+    Condition: ''
+    DependsOn: []
+    Properties:
+      ParentId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIRootResourceID}}
+      PathPart: failover-events
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Resource
+  FailoverEventsResourceOptionsMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'''
+              method.response.header.Access-Control-Allow-Methods: '''GET,POST,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: '{}'
+            StatusCode: '200'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      ResourceId: !Ref 'FailoverEventsResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Method
+  GetClusterInfo:
+    DependsOn:
+      - GetClusterInfoRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import os\nimport json\nimport boto3\n\ndef get_region(context):\n\
+          \    return context.invoked_function_arn.split(':')[3]\n    \ndef handler(event,\
+          \ context):\n    \n    print(json.dumps(event))\n    \n    data = {}\n \
+          \   rds_client = boto3.client('rds')\n\n    cluster_resp = rds_client.describe_db_clusters(\n\
+          \        DBClusterIdentifier = os.environ['REGIONAL_DB_CLUSTER_IDENTIFIER']\n\
+          \    )\n        \n    for member in cluster_resp['DBClusters'][0]['DBClusterMembers']:\n\
+          \        \n        instance_resp = rds_client.describe_db_instances(\n \
+          \           DBInstanceIdentifier = member['DBInstanceIdentifier']\n    \
+          \    )\n        \n        data[member['DBInstanceIdentifier']] = {\n   \
+          \         'az': instance_resp['DBInstances'][0]['AvailabilityZone'],\n \
+          \           'type': 'WRITER' if member['IsClusterWriter'] is True else 'READER'\n\
+          \        }\n        \n    return {\n        'records': data\n    }"
+      Description: ''
+      Environment:
+        Variables:
+          REGIONAL_DB_CLUSTER_IDENTIFIER: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RDSRegionalClusterIdentifier}}
+      Handler: index.handler
+      Layers:
+        - !If
+          - IsPrimaryRegion
+          - !Ref 'PrimaryLambdaLayerARN'
+          - !Ref 'FailoverLambdaLayerARN'
+      MemorySize: 128
+      Role: !GetAtt 'GetClusterInfoRole.Arn'
+      Runtime: python3.9
+      Timeout: 60
+      TracingConfig:
+        Mode: PassThrough
+      VpcConfig:
+        SecurityGroupIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /LambdaSecurityGroupID}}
+        SubnetIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrimaryPrivateSubnetID}}
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /FailoverPrivateSubnetID}}
+    Type: AWS::Lambda::Function
+  GetClusterInfoLogGroup:
+    DeletionPolicy: Retain
+    DependsOn:
+      - GetClusterInfo
+    Properties:
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'GetClusterInfo'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  GetClusterInfoMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.records')
+            StatusCode: '200'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 400.*'
+            StatusCode: '400'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 401.*'
+            StatusCode: '401'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 403.*'
+            StatusCode: '403'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 404.*'
+            StatusCode: '404'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 415.*'
+            StatusCode: '415'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 429.*'
+            StatusCode: '429'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 500.*'
+            StatusCode: '500'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{}'
+          application/x-www-form-urlencoded: '{}'
+        Type: AWS
+        Uri: !Join
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - :lambda:path/2015-03-31/functions/
+            - !GetAtt 'GetClusterInfo.Arn'
+            - /invocations
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '400'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '401'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '403'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '404'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '415'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '429'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '500'
+      OperationName: getClusterInfo
+      ResourceId: !Ref 'ClusterInfoResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Method
+  GetClusterInfoMethodInvocationPermission:
+    Condition: ''
+    DependsOn:
+      - GetClusterInfo
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt 'GetClusterInfo.Arn'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ''
+        - - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /APIID}}
+          - /*/
+          - GET
+          - /
+          - cluster-info
+    Type: AWS::Lambda::Permission
+  GetClusterInfoRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - rds:DescribeDBClusters
+                Effect: Allow
+                Resource:
+                  - '*'
+                Sid: DescribeRDSClusters
+          PolicyName: get-rds-clusters
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - rds:DescribeDBInstances
+                Effect: Allow
+                Resource:
+                  - '*'
+                Sid: DescribeDBInstances
+          PolicyName: get-db-instances
+    Type: AWS::IAM::Role
+  GetFailoverEvents:
+    DependsOn:
+      - GetFailoverEventsRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
+          import boto3\nimport psycopg2\nfrom botocore.exceptions import ClientError\
+          \ as boto3_client_error\n\ndef get_region(context):\n    return context.invoked_function_arn.split(':')[3]\n\
+          \ndef get_rds_credentials():\n    \n    secrets_manager_client = boto3.client('secretsmanager')\n\
+          \n    try:\n        \n        get_secret_value_response = secrets_manager_client.get_secret_value(\n\
+          \            SecretId = os.environ['REGIONAL_RDS_SECRET_ARN']\n        )\n\
+          \        \n    except boto3_client_error as e:\n        raise Exception('Failed\
+          \ to Retrieve RDS Secret: ' + str(e))\n        \n    else:\n        return\
+          \ json.loads(get_secret_value_response['SecretString'])\n        \ndef handler(event,\
+          \ context):\n    \n    print(json.dumps(event))\n    \n    rds_secret =\
+          \ get_rds_credentials()\n    \n    db_conn = psycopg2.connect(\n       \
+          \ host = os.environ['GLOBAL_DB_WRITER_ENDPOINT'],\n        port = rds_secret['port'],\n\
+          \        user = rds_secret['username'],\n        password = rds_secret['password'],\n\
+          \        database = rds_secret['database'],\n        connect_timeout = 3,\n\
+          \        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n\
+          \    \n    curs.execute('''\n        SELECT \n            event,\n     \
+          \       to_char(insertedon,'HH24:MI:SS') AS time, \n            insertedon\
+          \ \n        FROM failoverevents\n        ORDER BY insertedon\n    ''');\n\
+          \    \n    failover_events = curs.fetchall()\n    \n    curs.close()\n \
+          \   db_conn.close()\n    \n    records_to_return = []\n    \n    for x in\
+          \ failover_events:\n    \n        c = 0\n        temp2 = {}\n        \n\
+          \        for col in curs.description:\n            \n            temp2.update({str(col[0]):\
+          \ x[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n\
+          \    \n    return {\n        'records': records_to_return\n    }"
+      Description: ''
+      Environment:
+        Variables:
+          GLOBAL_DB_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RDSGlobalWriterDNSEndpoint}}
+          REGIONAL_RDS_SECRET_ARN: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RDSAdminSecretARN}}
+      Handler: index.handler
+      Layers:
+        - !If
+          - IsPrimaryRegion
+          - !Ref 'PrimaryLambdaLayerARN'
+          - !Ref 'FailoverLambdaLayerARN'
+      MemorySize: 128
+      Role: !GetAtt 'GetFailoverEventsRole.Arn'
+      Runtime: python3.9
+      Timeout: 60
+      TracingConfig:
+        Mode: PassThrough
+      VpcConfig:
+        SecurityGroupIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /LambdaSecurityGroupID}}
+        SubnetIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrimaryPrivateSubnetID}}
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /FailoverPrivateSubnetID}}
+    Type: AWS::Lambda::Function
+  GetFailoverEventsLogGroup:
+    DeletionPolicy: Retain
+    DependsOn:
+      - GetFailoverEvents
+    Properties:
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'GetFailoverEvents'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  GetFailoverEventsMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.records')
+            StatusCode: '200'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 400.*'
+            StatusCode: '400'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 401.*'
+            StatusCode: '401'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 403.*'
+            StatusCode: '403'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 404.*'
+            StatusCode: '404'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 415.*'
+            StatusCode: '415'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 429.*'
+            StatusCode: '429'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 500.*'
+            StatusCode: '500'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{}'
+          application/x-www-form-urlencoded: '{}'
+        Type: AWS
+        Uri: !Join
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - :lambda:path/2015-03-31/functions/
+            - !GetAtt 'GetFailoverEvents.Arn'
+            - /invocations
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '400'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '401'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '403'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '404'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '415'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '429'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '500'
+      OperationName: getFailoverEvents
+      ResourceId: !Ref 'FailoverEventsResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Method
+  GetFailoverEventsMethodInvocationPermission:
+    Condition: ''
+    DependsOn:
+      - GetFailoverEvents
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt 'GetFailoverEvents.Arn'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ''
+        - - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /APIID}}
+          - /*/
+          - GET
+          - /
+          - failover-events
+    Type: AWS::Lambda::Permission
+  GetFailoverEventsRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - rds-db:Connect
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RDSProxyARN}}
+                Sid: ConnectToRDSProxy
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RDSAdminSecretARN}}
+                Sid: GetRDSAdminSecret
+              - Action:
+                  - kms:Decrypt
+                Effect: Allow
+                Resource:
+                  - !If
+                    - IsPrimaryRegion
+                    - !Ref 'PrimaryKMSKeyID'
+                    - !Ref 'FailoverKMSKeyID'
+                Sid: DecryptWithKMS
+          PolicyName: database-secret-retrieval
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - ec2:ReplaceNetworkAclEntry
+                Effect: Allow
+                Resource:
+                  - '*'
+                Sid: UpdateACLEntry
+          PolicyName: custom-policy
+    Type: AWS::IAM::Role
+  RdsNaclResource:
+    Condition: ''
+    DependsOn: []
+    Properties:
+      ParentId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIRootResourceID}}
+      PathPart: rds-nacl
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Resource
+  RdsNaclResourceOptionsMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'''
+              method.response.header.Access-Control-Allow-Methods: '''GET,POST,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: '{}'
+            StatusCode: '200'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      ResourceId: !Ref 'RdsNaclResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Method
+  UpdateNACL:
+    DependsOn:
+      - UpdateNACLRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import os\nimport json\nimport boto3\n\ndef get_region(context):\n\
+          \    return context.invoked_function_arn.split(':')[3]\n    \ndef lambda_handler(event,\
+          \ context):\n    \n    print(json.dumps(event))\n    \n    ec2_client =\
+          \ boto3.client('ec2')\n    \n    ec2_client.replace_network_acl_entry(\n\
+          \        Egress = False, \n        CidrBlock = '0.0.0.0/0',\n        NetworkAclId\
+          \ = os.environ['RDS_ACL_ID'],\n        Protocol = '-1',\n        RuleAction\
+          \ = 'deny',\n        RuleNumber = 100\n    )\n    \n    return {\n     \
+          \   'records': []\n    }"
+      Description: ''
+      Environment:
+        Variables:
+          RDS_NACL_ID: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /DatabaseACLID}}
+      Handler: index.handler
+      Layers:
+        - !If
+          - IsPrimaryRegion
+          - !Ref 'PrimaryLambdaLayerARN'
+          - !Ref 'FailoverLambdaLayerARN'
+      MemorySize: 128
+      Role: !GetAtt 'UpdateNACLRole.Arn'
+      Runtime: python3.9
+      Timeout: 60
+      TracingConfig:
+        Mode: PassThrough
+      VpcConfig:
+        SecurityGroupIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /LambdaSecurityGroupID}}
+        SubnetIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrimaryPrivateSubnetID}}
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /FailoverPrivateSubnetID}}
+    Type: AWS::Lambda::Function
+  UpdateNACLLogGroup:
+    DeletionPolicy: Retain
+    DependsOn:
+      - UpdateNACL
+    Properties:
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'UpdateNACL'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  UpdateNACLMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.records')
+            StatusCode: '200'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 400.*'
+            StatusCode: '400'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 401.*'
+            StatusCode: '401'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 403.*'
+            StatusCode: '403'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 404.*'
+            StatusCode: '404'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 415.*'
+            StatusCode: '415'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 429.*'
+            StatusCode: '429'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: '.*"code": 500.*'
+            StatusCode: '500'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{}'
+          application/x-www-form-urlencoded: '{}'
+        Type: AWS
+        Uri: !Join
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - :lambda:path/2015-03-31/functions/
+            - !GetAtt 'UpdateNACL.Arn'
+            - /invocations
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '400'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '401'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '403'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '404'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '415'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '429'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '500'
+      OperationName: getFailoverEvents
+      ResourceId: !Ref 'RdsNaclResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /APIID}}
+    Type: AWS::ApiGateway::Method
+  UpdateNACLMethodInvocationPermission:
+    Condition: ''
+    DependsOn:
+      - UpdateNACL
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt 'UpdateNACL.Arn'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ''
+        - - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /APIID}}
+          - /*/
+          - GET
+          - /
+          - rds-nacl
+    Type: AWS::Lambda::Permission
+  UpdateNACLRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - ec2:ReplaceNetworkAclEntry
+                Effect: Allow
+                Resource:
+                  - '*'
+                Sid: UpdateACLEntry
+          PolicyName: custom-policy
+    Type: AWS::IAM::Role
