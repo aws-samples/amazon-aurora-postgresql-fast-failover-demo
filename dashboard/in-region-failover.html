@@ -168,18 +168,15 @@
 
                 </li>
                 <li class="nav-item">
-                    <button type="button" class="btn btn-secondary send_requests">Send client traffic</button>
-
+                    <button type="button" class="btn btn-secondary send_requests">Generate Client Traffic</button>
                 </li>
 
                 <li class="nav-item">
-                    <button type="button" class="btn btn-secondary trigger_failover">Send failover request</button>
-
+                    <button type="button" class="btn btn-secondary initiate_failover">Send Failover Request</button>
                 </li>
 
                 <li class="nav-item">
-                    <button type="button" class="btn btn-secondary clean">Clean</button>
-
+                    <button type="button" class="btn btn-secondary clean">Reset Environment</button>
                 </li>
 
             </ul>
@@ -297,7 +294,7 @@
                                 <div class="card-body">
                                     <h5 class="card-title">Downtime</h5>
                                     <div>
-                                        <span id="rto">0</span><span> seconds</span>
+                                        <span id="recovery_time">0</span><span> seconds</span>
                                     </div>
                                 </div>
                             </div>
@@ -309,7 +306,7 @@
 
                             <div class="main-card mb-3">
                                 <div class="card-body">
-                                    <h5 class="card-title">Availability zones</h5>
+                                    <h5 class="card-title">Availability Zones</h5>
                                     <div>
                                         <span id="primaryRegionZoneALabel"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                                         <span id="primaryRegionZoneAStatus"></span>
@@ -345,65 +342,69 @@
         	}
         
         	document.querySelector('.bypass').addEventListener('click', (e) => {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/bypass-rds-proxy');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/bypass-rds-proxy');
         		let result = fetch(request);
         		console.log(result)	
         		e.target.textContent = 'RDS Proxy Bypassed';
-        		e.target.className='btn btn-secondary disabled';
+        		e.target.className = 'btn btn-secondary disabled';
         		$("#myCarousel").carousel(2);
         	});
         		
         	document.querySelector('.clean').addEventListener('click', (e) => {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/reset-demo-environment');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/reset-demo-environment');
         		let result = fetch(request);
         		console.log(result)	
-        		e.target.textContent = 'Clean';
+        		e.target.textContent = 'Resetting...';
         		setTimeout(() => {  location.reload(); }, 5000);	
         	});
         
         	document.querySelector('.send_requests').addEventListener('click', (e) => {
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/traffic-generator');
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/generate-sample-traffic');
         		let result = fetch(request);
         		console.log(result)	
-        		e.target.textContent = 'Sending requests ...';
-        		e.target.className='btn btn-secondary disabled';
+        		e.target.textContent = 'Sending Requests...';
+        		e.target.className = 'btn btn-secondary disabled';
         	});
         		
-        		
-        	document.querySelector('.trigger_failover').addEventListener('click', (e) => {	
-        		let request = new Request('https://' + urlParams.get('apiHost') + '/v1/failover');
+        	document.querySelector('.initiate_failover').addEventListener('click', (e) => {	
+        		let request = new Request('https://' + urlParams.get('apiHost') + '/initiate-failover');
         		let result = fetch(request);
         		console.log(result)	
-        		e.target.textContent = 'Failover triggered';
-        		e.target.className='btn btn-secondary disabled';
+        		e.target.textContent = 'Failover Initiated...';
+        		e.target.className = 'btn btn-secondary disabled';
         	});
         
-        	function fetchEvents(){
-        		async function checkEvents() {
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/failover-events');
+        	function getFailoverEvents()
+        	{
+        		async function getFailoverEventData() 
+        		{
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/get-failover-events');
         			let result = await fetch(request);
         			let response = await result.text();
-        			mydata = JSON.parse(response)
+        			failover_events = JSON.parse(response)
         			
-        			for (var i in mydata) {
-        				
-        				if (mydata[i]['event']=='1'){
+        			for (var failover_event in failover_events) 
+        			{
+        				if (failover_events[failover_event]['event'] == '1')
+        				{
         					$("#denyVPC_badge").addClass("badge-success");
         					$("#denyVPC_title").addClass("timeline-title");
-        					$("#denyVPC_time").text(mydata[i]['time'])
-        				} else if (mydata[i]['event']=='2'){
+        					$("#denyVPC_time").text(failover_events[failover_event]['time'])
+        				} 
+        				else if (failover_events[failover_event]['event'] == '2')
+        				{
         					$("#canaryfailover_badge").addClass("badge-success");
         					$("#canaryfailover_title").addClass("timeline-title");
-        					$("#canaryfailover_time").text(mydata[i]['time'])
-        					$("#canaryfailover_lapsed").text('Lapsed ' + Math.round(Math.abs(new Date(mydata[i]['insertedon']) - new Date(mydata[0]['insertedon'])) / 1000) + ' sec')
-        					
-        				} else if (mydata[i]['event']=='3'){
+        					$("#canaryfailover_time").text(failover_events[failover_event]['time'])
+        					$("#canaryfailover_lapsed").text('Lapsed ' + Math.round(Math.abs(new Date(failover_events[failover_event]['insertedon']) - new Date(failover_events[0]['insertedon'])) / 1000) + ' sec')
+        				} 
+        				else if (failover_events[failover_event]['event'] == '3')
+        				{
         					$("#aurorafailover_badge").addClass("badge-success");
         					$("#aurorafailover_title").addClass("timeline-title");
-        					$("#aurorafailover_time").text(mydata[i]['time'])
-        					$("#aurorafailover_lapsed").text('Lapsed ' + Math.round(Math.abs(new Date(mydata[i]['insertedon']) - new Date(mydata[1]['insertedon'])) / 1000) + ' sec')
+        					$("#aurorafailover_time").text(failover_events[failover_event]['time'])
+        					$("#aurorafailover_lapsed").text('Lapsed ' + Math.round(Math.abs(new Date(failover_events[failover_event]['insertedon']) - new Date(failover_events[1]['insertedon'])) / 1000) + ' sec')
         					console.log($("#bypass").attr('class'))
-        					
         					
         					if ($("#bypass").attr('class').includes('disabled'))
         					{
@@ -418,42 +419,49 @@
         			}
         		}
         		
-        		setInterval(checkEvents, 5000);
+        		setInterval(getFailoverEventData, 5000);
         	}
+        	
+        	getFailoverEvents()
         
-        	function fetchRTO()
+        	function getCalculatedRecoveryTime()
         	{
-        		async function getRTO() 
+        		async function getCalculatedRecoveryTimeData() 
         		{
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/rto');
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/calculate-recovery-time');
         			let result = await fetch(request);
         			let response = await result.text();
-        			mydata = JSON.parse(response)
-        			for (var i in mydata) 
+
+        			recovery_time = JSON.parse(response)
+        			
+        			for (var recovery_time_record in recovery_time) 
         			{
-        				$("#rto").text(mydata[i]['rto'])
+        				$("#recovery_time").text(recovery_time[recovery_time_record]['rto'])
         			}
         		}
         		
-        		setInterval(getRTO, 5000);
+        		setInterval(getCalculatedRecoveryTimeData, 5000);
         	}
+        	
+        	getCalculatedRecoveryTime()
         
-        	function fetchClusterInfo()
+        	function getClusterInfo()
         	{
-        		async function getClusterInfo() 
+        		async function getClusterInfoData() 
         		{
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/cluster-info');
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/get-cluster-info');
         			let result = await fetch(request);
         			let response = await result.text();
         			
-        			mydata = JSON.parse(response)
-        			for (var i in mydata) 
+        			cluster_info = JSON.parse(response)
+        			
+        			for (var cluster_name in cluster_info) 
         			{	
-        				az_data = JSON.parse(mydata[i])
+        				az_data = cluster_info[cluster_name]
         				
         				if (az_data['az'] == primaryRegionName + 'a')
         				{
-        				    $('#primaryRegionZoneALabel').text(primaryRegionName)
+        				    $('#primaryRegionZoneALabel').text(primaryRegionName + 'a')
         					$('#primaryRegionZoneAStatus').text(az_data['type'])
         					
         					if (az_data['type'] == 'READER')
@@ -467,7 +475,7 @@
         				}
         				else if (az_data['az'] == primaryRegionName + 'b')
         				{
-        				    $('#primaryRegionZoneBLabel').text(primaryRegionName)
+        				    $('#primaryRegionZoneBLabel').text(primaryRegionName + 'b')
         					$('#primaryRegionZoneBStatus').text(az_data['type'])
         					
         					if (az_data['type'] == 'READER')
@@ -482,14 +490,10 @@
         			}
         		}
         		
-        		setInterval(getClusterInfo, 5000);
+        		setInterval(getClusterInfoData, 5000);
         	}
         
-        	fetchEvents()
-        
-        	fetchRTO()
-        
-        	fetchClusterInfo()
+        	getClusterInfo()
         
         	function getRandomIntInclusive(min, max) 
         	{
@@ -499,7 +503,7 @@
         	}
         
         	var ctx_live = document.getElementById("mycanvas");
-        	var myChart = new Chart(ctx_live, {
+        	var primaryRegionTrafficChart = new Chart(ctx_live, {
         	  type: 'line',
         	  data: {
         		labels: [],
@@ -532,7 +536,7 @@
         
         	var ctx_error = document.getElementById("cvsError");
         	
-        	var myChartError = new Chart(ctx_error, 
+        	var primaryRegionErrorChart = new Chart(ctx_error, 
         	{
                 type: 'line',
         	    data: 
@@ -573,51 +577,53 @@
         	    }
         	});
         
-        	function fetch_primary_region()
+        	function getPrimaryRegion()
         	{
-        		async function fetch_primary_region_data() 
+        		async function getPrimaryRegionData() 
         		{
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/west1');
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/get-client-traffic?region=primary');
         			let result = await fetch(request);
         			let response = await result.text();
         			
-        			mydata = JSON.parse(response)
+        			client_traffic = JSON.parse(response)
         			
-        			for (var i in mydata) 
+        			for (var traffic_record in client_traffic) 
         			{
-        				myChart.data.labels = mydata[i]['labels'].split(',')
+        				primaryRegionTrafficChart.data.labels = client_traffic[traffic_record]['labels'].split(',')
         
-        				myChart.data.datasets[0].data = mydata[i]['data'].split(',')
-        				myChart.update('none')			
+        				primaryRegionTrafficChart.data.datasets[0].data = client_traffic[traffic_record]['data'].split(',')
+        				primaryRegionTrafficChart.update('none')			
         			}	
         		}
         		
-        		setInterval(fetch_primary_region_data, 5000);
+        		setInterval(getPrimaryRegionData, 5000);
         	}
         
-        	fetch_primary_region()
+        	getPrimaryRegion()
         
-        	function fetchErrors()
+        	function getErrors()
         	{
-        		async function getErrors()
+        		async function getErrorData()
         		{
-        			let request = new Request('https://' + urlParams.get('apiHost') + '/v1/errors');
+        			let request = new Request('https://' + urlParams.get('apiHost') + '/get-client-errors');
         			let result = await fetch(request);
         			let response = await result.text();
         			
-        			mydata = JSON.parse(response)		
-        			for (var i in mydata) {	
-        				myChartError.data.labels=mydata[i]['labels'].split(',')
+        			client_errors = JSON.parse(response)		
+        			
+        			for (var client_error in client_errors) 
+        			{	
+        				primaryRegionErrorChart.data.labels = client_errors[client_error]['labels'].split(',')
         
-        				myChartError.data.datasets[0].data=mydata[i]['data'].split(',')
-        				myChartError.update('none')			
+        				primaryRegionErrorChart.data.datasets[0].data = client_errors[client_error]['data'].split(',')
+        				primaryRegionErrorChart.update('none')			
         			}	
         		}
         		
-        		setInterval(getErrors, 5000);
+        		setInterval(getErrorData, 5000);
         	}
         
-        	fetchErrors()
+        	getErrors()
     </script>
 </body>
 
