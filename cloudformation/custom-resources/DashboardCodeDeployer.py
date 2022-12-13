@@ -23,28 +23,19 @@ try:
 except ImportError:
     from urllib.error import HTTPError
     from urllib.request import build_opener, HTTPHandler, Request
-
-def delete_all_objects(bucket_name):
-    
-    try:
-            
-        boto3.resource('s3').Bucket(bucket_name).objects.all().delete()
-    
-    except boto3_client_error as e:
-        print('Failed to Empty Dashboard Bucket: ' + str(e))
-        return False
-    
-    return True
     
 '''
     - CodeBucketName | str
-    - CodeDownloadURL | str
+    - CodeDownloadUrl | str
 '''
 def handler(event, context):
     
     print(json.dumps(event))
     
     arguments = event['ResourceProperties']['Properties']
+    
+    s3_client = boto3.client('s3')
+    
     response_data = {}
     
     if event['RequestType'] in ['Create', 'Update']:
@@ -56,7 +47,7 @@ def handler(event, context):
             Download the codebase
         '''
         http = urllib3.PoolManager()
-        code_download_response = http.request('GET', arguments['CodeDownloadURL'], preload_content = False)
+        code_download_response = http.request('GET', arguments['CodeDownloadUrl'], preload_content = False)
         
         if code_download_response.status != 200:
             return False
@@ -70,8 +61,6 @@ def handler(event, context):
         with zipfile.ZipFile(path_to_local_zip, 'r') as zip_ref:
             zip_ref.extractall(path_to_local_dir)
             
-        s3_client = boto3.client('s3')
-        
         '''
             For each file in the local code directory
         '''
@@ -94,18 +83,43 @@ def handler(event, context):
                 except boto3_client_error as e:
                     print('Failed to Upload Dashboard File: ' + str(e))
                     return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
-                    
-        properties = event['ResourceProperties']
         
     elif event['RequestType'] in ['Delete']:
         
-        object_deletion = delete_all_objects(arguments['CodeBucketName'])
+        '''
+            Here, we'll delete all objects, versions, and delete markers from the bucket.
+        '''
+        object_response_paginator = s3_client.get_paginator('list_object_versions')
         
-        delete_marker_deletion = True
-        #delete_marker_deletion = delete_all_delete_markers(arguments['CodeBucketName'])
+        objects_to_delete = []
         
-        if object_deletion is False or delete_marker_deletion is False:
+        for object_response_iterator in object_response_paginator.paginate(Bucket = arguments['CodeBucketName']):
+            
+            for object_group in ['Versions', 'DeleteMarkers']:
                 
-            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
-    
+                if object_group in object_response_iterator:
+                
+                    for object_data in object_response_iterator[object_group]:
+                    
+                        objects_to_delete.append({
+                            'Key': object_data['Key'], 
+                            'VersionId': object_data['VersionId']
+                        })
+                    
+        for i in range(0, len(objects_to_delete), 1000):
+            
+            try:
+                
+                response = s3_client.delete_objects(
+                    Bucket = arguments['CodeBucketName'],
+                    Delete = {
+                        'Objects': objects_to_delete[i:i + 1000],
+                        'Quiet': True
+                    }
+                )
+                
+            except boto3_client_error as e:
+                print('Failed to Delete S3 Objects: ' + str(e))
+                return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+        
     return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)

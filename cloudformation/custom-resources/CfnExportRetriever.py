@@ -36,19 +36,21 @@ def handler(event, context):
             
             response = cfn_client.list_exports()
             
+            '''
+                For each CloudFormation export in this region
+            '''
             for export in response['Exports']:
             	
+                '''
+                    If this export has the proper prefix
+                '''
                 if export['Name'].startswith(arguments['ExportPrefix']):
+                    
                     response_data[export['Name'].replace(arguments['ExportPrefix'] + '-', '')] = export['Value']
                 
-            print(response_data)
-            
-            return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
-                
         except ClientError as e:
+            
             print('Failed to Retrieve CFN Exports: ' + str(e.response))
             return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
             
-    if event['RequestType'] in ['Delete']:
-        
-        return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
