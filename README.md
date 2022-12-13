@@ -5,13 +5,13 @@
 ## Cross-Region Recovery
 - The CloudFormation template sets up a two-region database cluster for Diaster Recoveryand statically stable application routing to the local databse cluster.
 - A Lambda canary process continually stans the primary region (every 10 seconds) from the secondary region, and enacts failover if it observes 30 seconds of consecutive failures.
-- 
+ 
 ![architecture for cross-region failover](architecture_multi_region.png)
 
 ## In-Region Recovery
 - Each region also contains an RDS Proxy to provide High Availability transparent failover to the failved-over writer in the secondary Availability Zone.
 - By queueing read and write queries until the reader instance comes back as a writer, RDS Proxy turns what would be SQL errors into a few extra seconds of latency for the application.
-- 
+
 ![architecture for cross-region failover](architecture_multi_region.png)
 
 ## Demos
