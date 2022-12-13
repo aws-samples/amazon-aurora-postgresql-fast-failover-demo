@@ -1,0 +1,222 @@
+Conditions:
+  IsFailoverRegion: !Not
+    - !Equals
+      - !Ref 'PrimaryRegionName'
+      - !Ref 'AWS::Region'
+  IsPrimaryRegion: !Equals
+    - !Ref 'PrimaryRegionName'
+    - !Ref 'AWS::Region'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups: []
+    ParameterLabels: {}
+  Comments: ''
+  CreatedBy: Carter Meyers (AWS)
+  Description: This application deploys a Global RDS Aurora cluster.
+  LastUpdated: December 13, 2022
+  Version: v1.03
+Outputs:
+  PeeringConnectionIdExport:
+    Condition: IsPrimaryRegion
+    Export:
+      Name: !Join
+        - ''
+        - - !Ref 'MainStackName'
+          - -PeeringConnectionId
+    Value: !Ref 'PeeringInvitation'
+Parameters:
+  CodeDownloadUrl:
+    Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
+    Description: The URL from which the supporting codebase can be downloaded. This
+      codebase is used to deploy the demo dashboard.
+    Type: String
+  DatabaseAdminPassword:
+    Description: The password to be used for the RDS Aurora admin account.
+    NoEcho: true
+    Type: String
+  DatabaseAdminUsername:
+    Description: The username to be used for the RDS Aurora admin account.
+    Type: String
+  FailoverDatabaseSubnetZoneACidr:
+    Default: 10.10.10.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  FailoverDatabaseSubnetZoneBCidr:
+    Default: 10.10.13.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  FailoverKmsKeyArn:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  FailoverPrivateSubnetZoneACidr:
+    Default: 10.10.9.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  FailoverPrivateSubnetZoneBCidr:
+    Default: 10.10.12.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  FailoverPublicSubnetZoneACidr:
+    Default: 10.10.8.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  FailoverPublicSubnetZoneBCidr:
+    Default: 10.10.11.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  FailoverRegionName:
+    Description: The name of the failover region (e.g., us-east-1). You may choose
+      any AWS Region that supports the required services.
+    Type: String
+  FailoverVpcCidr:
+    Default: 10.10.8.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  FailoverVpcId:
+    Type: String
+  MainStackName:
+    Type: String
+  PrimaryDatabaseSubnetZoneACidr:
+    Default: 10.10.2.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  PrimaryDatabaseSubnetZoneBCidr:
+    Default: 10.10.5.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  PrimaryKmsKeyArn:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  PrimaryPrivateSubnetZoneACidr:
+    Default: 10.10.1.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  PrimaryPrivateSubnetZoneBCidr:
+    Default: 10.10.4.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  PrimaryPublicSubnetZoneACidr:
+    Default: 10.10.0.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  PrimaryPublicSubnetZoneBCidr:
+    Default: 10.10.3.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  PrimaryRegionName:
+    Description: The name of the primary region (e.g., us-east-1). You may choose
+      any AWS Region that supports the required services.
+    Type: String
+  PrimaryVpcCidr:
+    Default: 10.10.0.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  PrimaryVpcId:
+    Type: String
+  PrivateHostedZoneId:
+    Type: String
+  PublicFqdn:
+    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
+      ALB.
+    Type: String
+  PublicHostedZoneId:
+    Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+    Type: String
+Resources:
+  PeeringInvitation:
+    Condition: IsPrimaryRegion
+    Properties:
+      PeerOwnerId: !Ref 'AWS::AccountId'
+      PeerRegion: !Ref 'FailoverRegionName'
+      PeerVpcId: !Ref 'FailoverVpcId'
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - !Ref 'MainStackName'
+              - '-'
+              - !Ref 'FailoverRegionName'
+      VpcId: !Ref 'PrimaryVpcId'
+    Type: AWS::EC2::VPCPeeringConnection
+  PrimaryRegionPeeringConnectionIdRetriever:
+    Condition: IsFailoverRegion
+    Properties:
+      Properties:
+        ExportPrefix: !Ref 'MainStackName'
+        Region: !Ref 'PrimaryRegionName'
+        Version: 1.05
+      ServiceToken: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /RegionalCfnExportRetrieverArn}}
+      Type: Custom::GetCFNExports
+      Version: '1.0'
+    Type: AWS::CloudFormation::CustomResource
+  ZoneARouteToFailoverRegion:
+    Condition: IsPrimaryRegion
+    DependsOn:
+      - PeeringInvitation
+    Properties:
+      DestinationCidrBlock: !Ref 'FailoverVpcCidr'
+      RouteTableId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - A
+          - Id}}
+      VpcPeeringConnectionId: !Ref 'PeeringInvitation'
+    Type: AWS::EC2::Route
+  ZoneARouteToPrimaryRegion:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - PrimaryRegionPeeringConnectionIdRetriever
+    Properties:
+      DestinationCidrBlock: !Ref 'PrimaryVpcCidr'
+      RouteTableId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - A
+          - Id}}
+      VpcPeeringConnectionId: !GetAtt 'PrimaryRegionPeeringConnectionIdRetriever.PeeringConnectionId'
+    Type: AWS::EC2::Route
+  ZoneBRouteToFailoverRegion:
+    Condition: IsPrimaryRegion
+    DependsOn:
+      - PeeringInvitation
+    Properties:
+      DestinationCidrBlock: !Ref 'FailoverVpcCidr'
+      RouteTableId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - B
+          - Id}}
+      VpcPeeringConnectionId: !Ref 'PeeringInvitation'
+    Type: AWS::EC2::Route
+  ZoneBRouteToPrimaryRegion:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - PrimaryRegionPeeringConnectionIdRetriever
+    Properties:
+      DestinationCidrBlock: !Ref 'PrimaryVpcCidr'
+      RouteTableId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - B
+          - Id}}
+      VpcPeeringConnectionId: !GetAtt 'PrimaryRegionPeeringConnectionIdRetriever.PeeringConnectionId'
+    Type: AWS::EC2::Route

@@ -1,0 +1,732 @@
+Conditions:
+  IsFailoverRegion: !Not
+    - !Equals
+      - !Ref 'PrimaryRegionName'
+      - !Ref 'AWS::Region'
+  IsPrimaryRegion: !Equals
+    - !Ref 'PrimaryRegionName'
+    - !Ref 'AWS::Region'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups: []
+    ParameterLabels: {}
+  Comments: ''
+  CreatedBy: Carter Meyers (AWS)
+  Description: This application deploys a Global RDS Aurora cluster.
+  LastUpdated: December 13, 2022
+  Version: v1.03
+Outputs:
+  DatabaseSubnetZoneAId:
+    Condition: ''
+    Value: !Ref 'DatabaseSubnetZoneA'
+  DatabaseSubnetZoneBId:
+    Condition: ''
+    Value: !Ref 'DatabaseSubnetZoneB'
+  LambdaSecurityGroupId:
+    Condition: ''
+    Value: !Ref 'LambdaSecurityGroup'
+  PrivateRouteTableZoneAId:
+    Condition: ''
+    Value: !Ref 'PrivateRouteTableZoneA'
+  PrivateRouteTableZoneBId:
+    Condition: ''
+    Value: !Ref 'PrivateRouteTableZoneB'
+  PrivateSubnetZoneAId:
+    Condition: ''
+    Value: !Ref 'PrivateSubnetZoneA'
+  PrivateSubnetZoneBId:
+    Condition: ''
+    Value: !Ref 'PrivateSubnetZoneB'
+  PublicSubnetZoneAId:
+    Condition: ''
+    Value: !Ref 'PublicSubnetZoneA'
+  PublicSubnetZoneBId:
+    Condition: ''
+    Value: !Ref 'PublicSubnetZoneB'
+  RegionalAppDatabaseNaclId:
+    Condition: ''
+    Value: !GetAtt 'DatabaseAcl.Id'
+  RegionalVpcId:
+    Condition: ''
+    Export:
+      Name: !Join
+        - '-'
+        - - !Ref 'MainStackName'
+          - RegionalVpcId
+    Value: !Ref 'Vpc'
+Parameters:
+  CodeDownloadUrl:
+    Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
+    Description: The URL from which the supporting codebase can be downloaded. This
+      codebase is used to deploy the demo dashboard.
+    Type: String
+  DatabaseAdminPassword:
+    Description: The password to be used for the RDS Aurora admin account.
+    NoEcho: true
+    Type: String
+  DatabaseAdminUsername:
+    Description: The username to be used for the RDS Aurora admin account.
+    Type: String
+  FailoverDatabaseSubnetZoneACidr:
+    Default: 10.10.10.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  FailoverDatabaseSubnetZoneBCidr:
+    Default: 10.10.13.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  FailoverKmsKeyArn:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  FailoverPrivateSubnetZoneACidr:
+    Default: 10.10.9.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  FailoverPrivateSubnetZoneBCidr:
+    Default: 10.10.12.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  FailoverPublicSubnetZoneACidr:
+    Default: 10.10.8.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  FailoverPublicSubnetZoneBCidr:
+    Default: 10.10.11.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  FailoverRegionName:
+    Description: The name of the failover region (e.g., us-east-1). You may choose
+      any AWS Region that supports the required services.
+    Type: String
+  FailoverVpcCidr:
+    Default: 10.10.8.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  MainStackName:
+    Type: String
+  PrimaryDatabaseSubnetZoneACidr:
+    Default: 10.10.2.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  PrimaryDatabaseSubnetZoneBCidr:
+    Default: 10.10.5.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  PrimaryKmsKeyArn:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  PrimaryPrivateSubnetZoneACidr:
+    Default: 10.10.1.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  PrimaryPrivateSubnetZoneBCidr:
+    Default: 10.10.4.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  PrimaryPublicSubnetZoneACidr:
+    Default: 10.10.0.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  PrimaryPublicSubnetZoneBCidr:
+    Default: 10.10.3.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  PrimaryRegionName:
+    Description: The name of the primary region (e.g., us-east-1). You may choose
+      any AWS Region that supports the required services.
+    Type: String
+  PrimaryVpcCidr:
+    Default: 10.10.0.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  PublicFqdn:
+    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
+      ALB.
+    Type: String
+  PublicHostedZoneId:
+    Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+    Type: String
+Resources:
+  DatabaseAcl:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref 'AWS::StackName'
+              - Database
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::NetworkAcl
+  DatabaseAclEgressEntry:
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      Egress: true
+      NetworkAclId: !Ref 'DatabaseAcl'
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 100
+    Type: AWS::EC2::NetworkAclEntry
+  DatabaseAclIngressEntry:
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      Egress: false
+      NetworkAclId: !Ref 'DatabaseAcl'
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 100
+    Type: AWS::EC2::NetworkAclEntry
+  DatabaseSubnetZoneA:
+    DependsOn:
+      - Vpc
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - - !Ref 'AWS::Region'
+          - a
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryDatabaseSubnetZoneACidr'
+        - !Ref 'FailoverDatabaseSubnetZoneACidr'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - DatabaseSubnetZoneA
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::Subnet
+  DatabaseSubnetZoneAAclAssociation:
+    Properties:
+      NetworkAclId: !Ref 'DatabaseAcl'
+      SubnetId: !Ref 'DatabaseSubnetZoneA'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+  DatabaseSubnetZoneAIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - Database
+          - ' Subnet Zone '
+          - A
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - DatabaseSubnetZoneAId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'DatabaseSubnetZoneA'
+    Type: AWS::SSM::Parameter
+  DatabaseSubnetZoneATableAssociation:
+    DependsOn:
+      - Vpc
+      - DatabaseSubnetZoneA
+      - PrivateRouteTableZoneA
+    Properties:
+      RouteTableId: !Ref 'PrivateRouteTableZoneA'
+      SubnetId: !Ref 'DatabaseSubnetZoneA'
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  DatabaseSubnetZoneB:
+    DependsOn:
+      - Vpc
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - - !Ref 'AWS::Region'
+          - b
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryDatabaseSubnetZoneBCidr'
+        - !Ref 'FailoverDatabaseSubnetZoneBCidr'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - DatabaseSubnetZoneB
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::Subnet
+  DatabaseSubnetZoneBAclAssociation:
+    Properties:
+      NetworkAclId: !Ref 'DatabaseAcl'
+      SubnetId: !Ref 'DatabaseSubnetZoneB'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+  DatabaseSubnetZoneBIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - Database
+          - ' Subnet Zone '
+          - B
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - DatabaseSubnetZoneBId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'DatabaseSubnetZoneB'
+    Type: AWS::SSM::Parameter
+  DatabaseSubnetZoneBTableAssociation:
+    DependsOn:
+      - Vpc
+      - DatabaseSubnetZoneB
+      - PrivateRouteTableZoneB
+    Properties:
+      RouteTableId: !Ref 'PrivateRouteTableZoneB'
+      SubnetId: !Ref 'DatabaseSubnetZoneB'
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  InternetGateway:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+    Type: AWS::EC2::InternetGateway
+  InternetGatewayVpcAssociation:
+    DependsOn:
+      - Vpc
+      - InternetGateway
+    Properties:
+      InternetGatewayId: !Ref 'InternetGateway'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::VPCGatewayAttachment
+  LambdaSecurityGroup:
+    Properties:
+      GroupDescription: Lambda Security Group
+      SecurityGroupEgress: []
+      SecurityGroupIngress: []
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::SecurityGroup
+  LambdaSecurityGroupIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'Lambda Security Group ID for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - LambdaSecurityGroupId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'LambdaSecurityGroup'
+    Type: AWS::SSM::Parameter
+  NatGatewayZoneA:
+    DependsOn:
+      - PublicSubnetZoneA
+      - NatGatewayZoneAElasticIp
+    Properties:
+      AllocationId: !GetAtt 'NatGatewayZoneAElasticIp.AllocationId'
+      SubnetId: !Ref 'PublicSubnetZoneA'
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - NatGatewayZoneA
+              - '-'
+              - !Ref 'AWS::StackName'
+    Type: AWS::EC2::NatGateway
+  NatGatewayZoneAElasticIp:
+    Properties:
+      Domain: vpc
+    Type: AWS::EC2::EIP
+  NatGatewayZoneB:
+    DependsOn:
+      - PublicSubnetZoneB
+      - NatGatewayZoneBElasticIp
+    Properties:
+      AllocationId: !GetAtt 'NatGatewayZoneBElasticIp.AllocationId'
+      SubnetId: !Ref 'PublicSubnetZoneB'
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - NatGatewayZoneB
+              - '-'
+              - !Ref 'AWS::StackName'
+    Type: AWS::EC2::NatGateway
+  NatGatewayZoneBElasticIp:
+    Properties:
+      Domain: vpc
+    Type: AWS::EC2::EIP
+  PrivateRouteTableZoneA:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PrivateRouteTableZoneA
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::RouteTable
+  PrivateRouteTableZoneAIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'ID of Private Route Table in Zone '
+          - A
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - PrivateRouteTableZoneAId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'PrivateRouteTableZoneA'
+    Type: AWS::SSM::Parameter
+  PrivateRouteTableZoneB:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PrivateRouteTableZoneB
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::RouteTable
+  PrivateRouteTableZoneBIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'ID of Private Route Table in Zone '
+          - B
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - PrivateRouteTableZoneBId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'PrivateRouteTableZoneB'
+    Type: AWS::SSM::Parameter
+  PrivateSubnetRouteToNatGatewayZoneA:
+    DependsOn:
+      - NatGatewayZoneA
+      - PrivateRouteTableZoneA
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref 'NatGatewayZoneA'
+      RouteTableId: !Ref 'PrivateRouteTableZoneA'
+    Type: AWS::EC2::Route
+  PrivateSubnetRouteToNatGatewayZoneB:
+    DependsOn:
+      - NatGatewayZoneB
+      - PrivateRouteTableZoneB
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref 'NatGatewayZoneB'
+      RouteTableId: !Ref 'PrivateRouteTableZoneB'
+    Type: AWS::EC2::Route
+  PrivateSubnetZoneA:
+    DependsOn:
+      - Vpc
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - - !Ref 'AWS::Region'
+          - a
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryPrivateSubnetZoneACidr'
+        - !Ref 'FailoverPrivateSubnetZoneACidr'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PrivateSubnetZoneA
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::Subnet
+  PrivateSubnetZoneAIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - Private
+          - ' Subnet Zone '
+          - A
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - PrivateSubnetZoneAId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'PrivateSubnetZoneA'
+    Type: AWS::SSM::Parameter
+  PrivateSubnetZoneATableAssociation:
+    DependsOn:
+      - Vpc
+      - PrivateSubnetZoneA
+      - PrivateRouteTableZoneA
+    Properties:
+      RouteTableId: !Ref 'PrivateRouteTableZoneA'
+      SubnetId: !Ref 'PrivateSubnetZoneA'
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PrivateSubnetZoneB:
+    DependsOn:
+      - Vpc
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - - !Ref 'AWS::Region'
+          - b
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryPrivateSubnetZoneBCidr'
+        - !Ref 'FailoverPrivateSubnetZoneBCidr'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PrivateSubnetZoneB
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::Subnet
+  PrivateSubnetZoneBIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - Private
+          - ' Subnet Zone '
+          - B
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - PrivateSubnetZoneBId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'PrivateSubnetZoneB'
+    Type: AWS::SSM::Parameter
+  PrivateSubnetZoneBTableAssociation:
+    DependsOn:
+      - Vpc
+      - PrivateSubnetZoneB
+      - PrivateRouteTableZoneB
+    Properties:
+      RouteTableId: !Ref 'PrivateRouteTableZoneB'
+      SubnetId: !Ref 'PrivateSubnetZoneB'
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PublicRouteTable:
+    DependsOn:
+      - Vpc
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PublicRouteTable-
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::RouteTable
+  PublicRouteToInternet:
+    DependsOn:
+      - InternetGateway
+      - PublicRouteTable
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+      RouteTableId: !Ref 'PublicRouteTable'
+    Type: AWS::EC2::Route
+  PublicSubnetZoneA:
+    DependsOn:
+      - Vpc
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - - !Ref 'AWS::Region'
+          - a
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryPublicSubnetZoneACidr'
+        - !Ref 'FailoverPublicSubnetZoneACidr'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PublicSubnetZoneA
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::Subnet
+  PublicSubnetZoneAIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - Public
+          - ' Subnet Zone '
+          - A
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - PublicSubnetZoneAId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'PublicSubnetZoneA'
+    Type: AWS::SSM::Parameter
+  PublicSubnetZoneATableAssociation:
+    DependsOn:
+      - Vpc
+      - PublicSubnetZoneA
+      - PublicRouteTable
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      SubnetId: !Ref 'PublicSubnetZoneA'
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PublicSubnetZoneB:
+    DependsOn:
+      - Vpc
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - - !Ref 'AWS::Region'
+          - b
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryPublicSubnetZoneBCidr'
+        - !Ref 'FailoverPublicSubnetZoneBCidr'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - PublicSubnetZoneB
+              - '-'
+              - !Ref 'AWS::StackName'
+      VpcId: !Ref 'Vpc'
+    Type: AWS::EC2::Subnet
+  PublicSubnetZoneBIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - Public
+          - ' Subnet Zone '
+          - B
+          - ' for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - PublicSubnetZoneBId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'PublicSubnetZoneB'
+    Type: AWS::SSM::Parameter
+  PublicSubnetZoneBTableAssociation:
+    DependsOn:
+      - Vpc
+      - PublicSubnetZoneB
+      - PublicRouteTable
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      SubnetId: !Ref 'PublicSubnetZoneB'
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  RegionalAppDatabaseNaclIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'Database ACL ID for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - RegionalAppDatabaseNaclId
+      Tier: Standard
+      Type: String
+      Value: !GetAtt 'DatabaseAcl.Id'
+    Type: AWS::SSM::Parameter
+  RegionalVpcIdParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'VPC for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - RegionalVpcId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'Vpc'
+    Type: AWS::SSM::Parameter
+  Vpc:
+    Properties:
+      CidrBlock: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryVpcCidr'
+        - !Ref 'FailoverVpcCidr'
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+    Type: AWS::EC2::VPC

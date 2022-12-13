@@ -1,0 +1,736 @@
+{
+ "Conditions": {
+  "IsFailoverRegion": {
+   "Fn::Not": [
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "PrimaryRegionName"
+      },
+      {
+       "Ref": "AWS::Region"
+      }
+     ]
+    }
+   ]
+  },
+  "IsPrimaryRegion": {
+   "Fn::Equals": [
+    {
+     "Ref": "PrimaryRegionName"
+    },
+    {
+     "Ref": "AWS::Region"
+    }
+   ]
+  }
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [],
+   "ParameterLabels": {}
+  },
+  "Comments": "",
+  "CreatedBy": "Carter Meyers (AWS)",
+  "Description": "This application deploys a Global RDS Aurora cluster.",
+  "LastUpdated": "December 13, 2022",
+  "Version": "v1.03"
+ },
+ "Outputs": {
+  "RegionalCfnExportRetrieverArn": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "CfnExportRetriever",
+     "Arn"
+    ]
+   }
+  },
+  "RegionalDnsRecordDeleterArn": {
+   "Condition": "",
+   "Value": {
+    "Fn::If": [
+     "IsPrimaryRegion",
+     {
+      "Fn::GetAtt": [
+       "DnsRecordDeleter",
+       "Arn"
+      ]
+     },
+     "-"
+    ]
+   }
+  },
+  "RegionalLambdaLayerVersionArn": {
+   "Condition": "",
+   "Value": {
+    "Ref": "LambdaLayerCreatorResource"
+   }
+  }
+ },
+ "Parameters": {
+  "CodeDownloadUrl": {
+   "Default": "https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main",
+   "Description": "The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.",
+   "Type": "String"
+  },
+  "DatabaseAdminPassword": {
+   "Description": "The password to be used for the RDS Aurora admin account.",
+   "NoEcho": true,
+   "Type": "String"
+  },
+  "DatabaseAdminUsername": {
+   "Description": "The username to be used for the RDS Aurora admin account.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneACidr": {
+   "Default": "10.10.10.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.13.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "FailoverKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneACidr": {
+   "Default": "10.10.9.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneBCidr": {
+   "Default": "10.10.12.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneACidr": {
+   "Default": "10.10.8.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneBCidr": {
+   "Default": "10.10.11.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "FailoverRegionName": {
+   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "FailoverVpcCidr": {
+   "Default": "10.10.8.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "MainStackName": {
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneACidr": {
+   "Default": "10.10.2.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.5.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "PrimaryKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneACidr": {
+   "Default": "10.10.1.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneBCidr": {
+   "Default": "10.10.4.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneACidr": {
+   "Default": "10.10.0.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneBCidr": {
+   "Default": "10.10.3.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "PrimaryRegionName": {
+   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "PrimaryVpcCidr": {
+   "Default": "10.10.0.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "PrivateHostedZoneId": {
+   "Type": "String"
+  },
+  "PublicFqdn": {
+   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB.",
+   "Type": "String"
+  },
+  "PublicHostedZoneId": {
+   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Type": "String"
+  }
+ },
+ "Resources": {
+  "CfnExportRetriever": {
+   "DependsOn": [
+    "CfnExportRetrieverRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1, '/tmp/')\n\nimport io\nimport os\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Region | str\n    - ExportPrefix | str\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n    response_data = {}\n    \n    boto3Session = boto3.Session(\n        region_name = arguments['Region']\n    )\n    \n    cfn_client = boto3Session.client('cloudformation')\n    \n    if event['RequestType'] in ['Create', 'Update']:\n        \n        try:\n            \n            response = cfn_client.list_exports()\n            \n            '''\n                For each CloudFormation export in this region\n            '''\n            for export in response['Exports']:\n            \t\n                '''\n                    If this export has the proper prefix\n                '''\n                if export['Name'].startswith(arguments['ExportPrefix']):\n                    \n                    response_data[export['Name'].replace(arguments['ExportPrefix'] + '-', '')] = export['Value']\n                \n        except ClientError as e:\n            \n            print('Failed to Retrieve CFN Exports: ' + str(e.response))\n            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n            \n    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)"
+    },
+    "Description": "",
+    "Handler": "index.handler",
+    "Layers": [],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "CfnExportRetrieverRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 15,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "CfnExportRetrieverLogGroup": {
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "CfnExportRetriever"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "CfnExportRetriever"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "CfnExportRetrieverRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "cloudformation:ListExports"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          "*"
+         ],
+         "Sid": "GetCFNOutputs"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "DnsRecordDeleter": {
+   "Condition": "IsPrimaryRegion",
+   "DependsOn": [
+    "DnsRecordDeleterRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1, '/tmp/')\n\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Fqdns | list \n    - HostedZoneId | str\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n    response_data = {}\n    \n    route53_client = boto3.client('route53')\n    \n    if event['RequestType'] in ['Delete']:\n        \n        try:\n            \n            record_sets_resp = route53_client.list_resource_record_sets(\n                HostedZoneId = arguments['HostedZoneId'],\n            )\n            \n            change_batch = []\n            \n            for record_set in record_sets_resp['ResourceRecordSets']:\n                \n                '''\n                    We'll be leaving NS and SOA records.\n                '''\n                if record_set['Type'] in ['NS', 'SOA']:\n                    continue\n                \n                '''\n                    If we've been instructed to delete all FQDNs or this FQDN\n                    \n                    We're going to use for comparison the raw record name from Route53\n                    as well as the name minus the trailing period.\n                '''\n                if '*' in arguments['Fqdns'] or (record_set['Name'] in arguments['Fqdns'] or record_set['Name'][0:-1] in arguments['Fqdns']):\n                    \n                    change_batch.append({\n                        'Action': 'DELETE',\n                        'ResourceRecordSet': record_set,\n                    })\n            \n            if len(change_batch) > 0:\n                \n                route53_client.change_resource_record_sets(\n                    HostedZoneId = arguments['HostedZoneId'],\n                    ChangeBatch = {\n                        'Changes': change_batch\n                    }\n                )\n                \n        except ClientError as e:\n            \n            print('Failed to Delete DNS Records: ' + str(e.response))\n            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n            \n    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)"
+    },
+    "Description": "Deletes DNS Records on Stack Cleanup",
+    "Handler": "index.handler",
+    "Layers": [],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "DnsRecordDeleterRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 15,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "DnsRecordDeleterLogGroup": {
+   "Condition": "IsPrimaryRegion",
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "DnsRecordDeleter"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "DnsRecordDeleter"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "DnsRecordDeleterRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "route53:ListResourceRecordSets",
+          "route53:ChangeResourceRecordSets"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:route53:::hostedzone/",
+             {
+              "Ref": "PublicHostedZoneId"
+             }
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:route53:::hostedzone/",
+             {
+              "Ref": "PrivateHostedZoneId"
+             }
+            ]
+           ]
+          }
+         ],
+         "Sid": "DeleteRoute53Records"
+        }
+       ]
+      },
+      "PolicyName": "delete-route53-records"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "LambdaLayerCreator": {
+   "DependsOn": [
+    "LambdaLayerCreatorRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "_B='Type'\n_A='%H:%M:%S'\nimport sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\nimport io,os,json,boto3,shutil,cfnresponse\nfrom zipfile import ZipFile\nfrom botocore.exceptions import ClientError as boto3_client_error\ndef zip_directory(path):\n\tfor (B,F,C) in os.walk(path):\n\t\tfor D in C:A=os.path.join(B,D);E=A[len(path)+len(os.sep):];yield(A,E)\ndef make_zip_file_bytes(path):\n\tA=io.BytesIO()\n\twith ZipFile(A,'w')as B:\n\t\tfor (C,D) in zip_directory(path=path):B.write(C,D)\n\treturn A.getvalue()\n'\\n    - Region | str\\n    - Packages | list\\n    - LayerName | str\\n'\ndef handler(event,context):\n\tM='RequestType';L='ResourceProperties';H='LayerName';C=context;A=event;print(json.dumps(A));B=A[L]['Properties'];N=A[L][_B].replace('Custom::','');D={};I=boto3.Session(region_name=B['Region']);E=I.client('lambda')\n\tif A[M]in['Create','Update']:\n\t\tsubprocess.call(('pip install '+' '.join(B['Packages'])+' -t /tmp/lambda-layer --no-cache-dir').split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);shutil.copyfile(os.path.realpath(__file__),'/tmp/lambda-layer/multi_region_db.py')\n\t\ttry:G=E.publish_layer_version(LayerName=B[H],Content={'ZipFile':make_zip_file_bytes('/tmp/lambda-layer')},CompatibleRuntimes=['python3.9'],CompatibleArchitectures=['x86_64','arm64']);return cfnresponse.send(A,C,cfnresponse.SUCCESS,D,G['LayerVersionArn'])\n\t\texcept boto3_client_error as F:print('Failed to Deploy Lambda Layer: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\tif A[M]in['Delete']:\n\t\ttry:\n\t\t\tJ=E.list_layer_versions(LayerName=B[H])\n\t\t\tfor K in J['LayerVersions']:G=E.delete_layer_version(LayerName=B[H],VersionNumber=K['Version'])\n\t\texcept boto3_client_error as F:print('Failed to Delete Layer Versions: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\t\treturn cfnresponse.send(A,C,cfnresponse.SUCCESS,D)\nimport dateutil.tz\nfrom datetime import datetime\nfrom datetime import timedelta\nclass Functions:\n\tdef __init__(A):''\n\tdef add_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=5)).strftime(_A)\n\tdef subtract_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=-5)).strftime(_A)\n\tdef add_time(C,label,data):\n\t\tA=label;D=dateutil.tz.gettz('US/Pacific');B=datetime.now(tz=D);print(datetime.strptime(A[len(A)-1],_A)+timedelta(seconds=9));print(datetime.strptime(B.strftime(_A),_A))\n\t\twhile datetime.strptime(A[len(A)-1],_A)+timedelta(seconds=9)<datetime.strptime(B.strftime(_A),_A):print('add');A.pop(0);data.pop(0);A.append(C.add_five_seconds(A[len(A)-1]));data.append('0')\n\t'\\n        Requires \"REGIONAL_(APP|DEMO)_DB_SECRET_ARN\" as an environment variable\\n        \\n        - db_identifier | str (App|Demo)\\n    '\n\tdef get_db_credentials(E,db_identifier):\n\t\tA=db_identifier;B=boto3.client('secretsmanager')\n\t\ttry:C=B.get_secret_value(SecretId=os.environ['REGIONAL_'+A.upper()+'_DB_SECRET_ARN'])\n\t\texcept boto3_client_error as D:raise Exception('Failed to Retrieve '+A+' Database Secret: '+str(D))\n\t\telse:return json.loads(C['SecretString'])\n\t'\\n        fqdn | str\\n        newValue | str\\n        hostedZoneId | str\\n        [ ttl | int ]\\n        [ type | str ]\\n    '\n\tdef update_dns_record(C,fqdn,new_value,hosted_zone_id,ttl=1,record_type='CNAME'):\n\t\tA=boto3.client('route53')\n\t\ttry:A.change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':fqdn,'ResourceRecords':[{'Value':new_value}],'TTL':ttl,_B:record_type}}]},HostedZoneId=hosted_zone_id)\n\t\texcept boto3_client_error as B:raise Exception('Failed to Update DNS Record: '+str(B))\n\t\treturn True"
+    },
+    "Description": "",
+    "Handler": "index.handler",
+    "Layers": [],
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "LambdaLayerCreatorRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 60,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "LambdaLayerCreatorLogGroup": {
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "LambdaLayerCreator"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "LambdaLayerCreator"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "LambdaLayerCreatorResource": {
+   "DependsOn": [
+    "LambdaLayerCreatorLogGroup"
+   ],
+   "Properties": {
+    "Properties": {
+     "LayerName": {
+      "Ref": "AWS::StackName"
+     },
+     "Packages": [
+      "requests",
+      "cfnresponse",
+      "psycopg2-binary"
+     ],
+     "Region": {
+      "Ref": "AWS::Region"
+     },
+     "Version": 1.0
+    },
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LambdaLayerCreator",
+      "Arn"
+     ]
+    },
+    "Type": "Custom::DeployLambdaLayer",
+    "Version": "1.0"
+   },
+   "Type": "AWS::CloudFormation::CustomResource"
+  },
+  "LambdaLayerCreatorRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "lambda:ListLayerVersions",
+          "lambda:DeleteLayerVersion",
+          "lambda:PublishLayerVersion"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            ":",
+            [
+             "arn",
+             {
+              "Ref": "AWS::Partition"
+             },
+             "lambda",
+             {
+              "Ref": "PrimaryRegionName"
+             },
+             {
+              "Ref": "AWS::AccountId"
+             },
+             "layer",
+             {
+              "Ref": "AWS::StackName"
+             }
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            ":",
+            [
+             "arn",
+             {
+              "Ref": "AWS::Partition"
+             },
+             "lambda",
+             {
+              "Ref": "FailoverRegionName"
+             },
+             {
+              "Ref": "AWS::AccountId"
+             },
+             "layer",
+             {
+              "Ref": "AWS::StackName"
+             }
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            ":",
+            [
+             "arn",
+             {
+              "Ref": "AWS::Partition"
+             },
+             "lambda",
+             {
+              "Ref": "PrimaryRegionName"
+             },
+             {
+              "Ref": "AWS::AccountId"
+             },
+             "layer",
+             {
+              "Ref": "AWS::StackName"
+             },
+             "*"
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            ":",
+            [
+             "arn",
+             {
+              "Ref": "AWS::Partition"
+             },
+             "lambda",
+             {
+              "Ref": "FailoverRegionName"
+             },
+             {
+              "Ref": "AWS::AccountId"
+             },
+             "layer",
+             {
+              "Ref": "AWS::StackName"
+             },
+             "*"
+            ]
+           ]
+          }
+         ],
+         "Sid": "CreateAndDeleteLambdaLayers"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "RegionalCfnExportRetrieverArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Regional CFN Export Retriever Lambda ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalCfnExportRetrieverArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "CfnExportRetriever",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalDnsRecordDeleterArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Regional DNS Record Deleter Lambda ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalDnsRecordDeleterArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::If": [
+      "IsPrimaryRegion",
+      {
+       "Fn::GetAtt": [
+        "DnsRecordDeleter",
+        "Arn"
+       ]
+      },
+      "-"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalLambdaLayerVersionArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Regional Lambda Layer Version ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalLambdaLayerVersionArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Ref": "LambdaLayerCreatorResource"
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  }
+ }
+}

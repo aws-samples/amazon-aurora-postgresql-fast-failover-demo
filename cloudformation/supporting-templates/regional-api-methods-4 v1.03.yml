@@ -1,0 +1,574 @@
+Conditions:
+  IsFailoverRegion: !Not
+    - !Equals
+      - !Ref 'PrimaryRegionName'
+      - !Ref 'AWS::Region'
+  IsPrimaryRegion: !Equals
+    - !Ref 'PrimaryRegionName'
+    - !Ref 'AWS::Region'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups: []
+    ParameterLabels: {}
+  Comments: ''
+  CreatedBy: Carter Meyers (AWS)
+  Description: This application deploys a Global RDS Aurora cluster.
+  LastUpdated: December 13, 2022
+  Version: v1.03
+Parameters:
+  CodeDownloadUrl:
+    Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
+    Description: The URL from which the supporting codebase can be downloaded. This
+      codebase is used to deploy the demo dashboard.
+    Type: String
+  DatabaseAdminPassword:
+    Description: The password to be used for the RDS Aurora admin account.
+    NoEcho: true
+    Type: String
+  DatabaseAdminUsername:
+    Description: The username to be used for the RDS Aurora admin account.
+    Type: String
+  FailoverDatabaseSubnetZoneACidr:
+    Default: 10.10.10.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  FailoverDatabaseSubnetZoneBCidr:
+    Default: 10.10.13.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  FailoverKmsKeyArn:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  FailoverPrivateSubnetZoneACidr:
+    Default: 10.10.9.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  FailoverPrivateSubnetZoneBCidr:
+    Default: 10.10.12.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  FailoverPublicSubnetZoneACidr:
+    Default: 10.10.8.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  FailoverPublicSubnetZoneBCidr:
+    Default: 10.10.11.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  FailoverRegionName:
+    Description: The name of the failover region (e.g., us-east-1). You may choose
+      any AWS Region that supports the required services.
+    Type: String
+  FailoverVpcCidr:
+    Default: 10.10.8.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  MainStackName:
+    Type: String
+  PrimaryDatabaseSubnetZoneACidr:
+    Default: 10.10.2.0/24
+    Description: The CIDR range you wish to use for your primary database subnet.
+    Type: String
+  PrimaryDatabaseSubnetZoneBCidr:
+    Default: 10.10.5.0/24
+    Description: The CIDR range you wish to use for your failover database subnet.
+    Type: String
+  PrimaryKmsKeyArn:
+    Description: >-
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
+      Manager). This must correspond to a multi-region CMK available in both the primary
+      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+    Type: String
+  PrimaryPrivateSubnetZoneACidr:
+    Default: 10.10.1.0/24
+    Description: The CIDR range you wish to use for your primary private subnet.
+    Type: String
+  PrimaryPrivateSubnetZoneBCidr:
+    Default: 10.10.4.0/24
+    Description: The CIDR range you wish to use for your failover private subnet.
+    Type: String
+  PrimaryPublicSubnetZoneACidr:
+    Default: 10.10.0.0/24
+    Description: The CIDR range you wish to use for your primary public subnet.
+    Type: String
+  PrimaryPublicSubnetZoneBCidr:
+    Default: 10.10.3.0/24
+    Description: The CIDR range you wish to use for your failover public subnet.
+    Type: String
+  PrimaryRegionName:
+    Description: The name of the primary region (e.g., us-east-1). You may choose
+      any AWS Region that supports the required services.
+    Type: String
+  PrimaryVpcCidr:
+    Default: 10.10.0.0/21
+    Description: The CIDR range you wish to use for your VPC.
+    Type: String
+  PrivateHostedZoneId:
+    Type: String
+  PublicFqdn:
+    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
+      ALB.
+    Type: String
+  PublicHostedZoneId:
+    Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+    Type: String
+Resources:
+  ClientEmulator:
+    DependsOn:
+      - ClientEmulatorRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
+          import uuid\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport\
+          \ urllib.request\nimport multi_region_db\nfrom botocore.vendored import\
+          \ requests\n\ncustom_functions = multi_region_db.Functions()\n        \n\
+          def handler(event, context):\n    \n    print(json.dumps(event))\n    \n\
+          \    guid = uuid.uuid4()\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
+          \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
+          \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
+          \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
+          \        password = demo_db_credentials['password'],\n        database =\
+          \ demo_db_credentials['database'],\n        connect_timeout = 3,\n     \
+          \   sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    \n \
+          \   curs.execute(\"INSERT INTO dataclient (guid, primary_region, failover_region,\
+          \ http_code, insertedon) VALUES ('{}', 0, 0, 0, '{}');\".format(\n     \
+          \   str(guid),\n        datetime.datetime.now(tz = eastern).strftime(\"\
+          %m/%d/%Y %H:%M:%S\")\n    ))\n    \n    db_conn.commit()\n    \n    http_code\
+          \ = 200\n    http_content = ''\n\n    print('END guid: ' + str(guid))\n\n\
+          \    try:\n        \n        res = urllib.request.urlopen(\n           \
+          \ urllib.request.Request(\n                url = 'https://' + os.environ['PUBLIC_FQDN']\
+          \ + '?guid=' + str(guid),\n                method = 'GET',\n           \
+          \ ),\n            timeout = 5\n        )\n        \n        http_code =\
+          \ res.status\n        http_content = res.read().decode()\n        \n   \
+          \ except Exception as e:\n        http_code = 500\n        print('Client\
+          \ Web Request Failed :' + str(e))\n\n    try: \n\n        if http_code >\
+          \ 200:\n            http_content = ''\n            \n        curs = db_conn.cursor()\n\
+          \        \n        curs.execute('''\n            UPDATE dataclient SET\n\
+          \                primary_region  = {},\n                failover_region\
+          \ = {},\n                http_code       = {}\n            WHERE guid =\
+          \ '{}'\n        '''.format(\n            1 if http_content == os.environ['PRIMARY_REGION_NAME']\
+          \ else 0,\n            1 if http_content == os.environ['FAILOVER_REGION_NAME']\
+          \ else 0,\n            http_code,\n            str(guid)\n        ))\n \
+          \       \n        db_conn.commit()\n        \n    except Exception as ex:\n\
+          \        http_code = 500\n        print('Failed to Update Client Request:\
+          \ ' + str(ex) + ' - HTTP Content: \"' + http_content + '\"')\n    \n   \
+          \ curs.close()\n    db_conn.close()\n    \n    return True"
+      Description: Emulates legitimate client traffic
+      Environment:
+        Variables:
+          FAILOVER_REGION_NAME: !Ref 'FailoverRegionName'
+          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /GlobalDemoDbWriterDnsEndpoint}}
+          PRIMARY_REGION_NAME: !Ref 'PrimaryRegionName'
+          PUBLIC_FQDN: !Ref 'PublicFqdn'
+          REGIONAL_DEMO_DB_SECRET_ARN: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalDemoDbAdminSecretArn}}
+      Handler: index.handler
+      Layers:
+        - !Join
+          - ''
+          - - '{{resolve:ssm:/'
+            - !Ref 'MainStackName'
+            - /RegionalLambdaLayerVersionArn}}
+      MemorySize: 128
+      Role: !GetAtt 'ClientEmulatorRole.Arn'
+      Runtime: python3.9
+      Timeout: 60
+      TracingConfig:
+        Mode: PassThrough
+      VpcConfig:
+        SecurityGroupIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /LambdaSecurityGroupId}}
+        SubnetIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrivateSubnetZoneAId}}
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrivateSubnetZoneBId}}
+    Type: AWS::Lambda::Function
+  ClientEmulatorLogGroup:
+    DeletionPolicy: Delete
+    DependsOn:
+      - ClientEmulator
+    Properties:
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'ClientEmulator'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  ClientEmulatorRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RegionalAppDbAdminSecretArn}}
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RegionalDemoDbAdminSecretArn}}
+                Sid: GetRDSAdminSecret
+              - Action:
+                  - kms:Decrypt
+                Effect: Allow
+                Resource:
+                  - !If
+                    - IsPrimaryRegion
+                    - !Ref 'PrimaryKmsKeyArn'
+                    - !Ref 'FailoverKmsKeyArn'
+                Sid: DecryptWithKMS
+          PolicyName: database-secret-retrieval
+    Type: AWS::IAM::Role
+  ClientEmulatorTopicSubscription:
+    DependsOn:
+      - ClientEmulator
+      - TestTrafficTopic
+      - TestTrafficTopicPermission
+    Properties:
+      Endpoint: !GetAtt 'ClientEmulator.Arn'
+      Protocol: lambda
+      TopicArn: !Ref 'TestTrafficTopic'
+    Type: AWS::SNS::Subscription
+  GenerateSampleTraffic:
+    DependsOn:
+      - GenerateSampleTrafficRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import os\nimport time\nimport json\nimport boto3\n\ndef handler(event,\
+          \ context):\n    \n    print(json.dumps(event))\n\n    sns_client = boto3.client('sns')\n\
+          \    \n    for i in range(0, 10000):\n        \n        sns_client.publish(\n\
+          \            Message = 'Hola',\n            TargetArn = os.environ['TEST_TRAFFIC_TOPIC_ARN'],\n\
+          \        )\n        \n        time.sleep(0.1)\n    \n    return {\n    \
+          \    'code': 200,\n        'body': json.dumps([])\n    }\n"
+      Description: Generates test client traffic
+      Environment:
+        Variables:
+          TEST_TRAFFIC_TOPIC_ARN: !Ref 'TestTrafficTopic'
+      Handler: index.handler
+      Layers:
+        - !Join
+          - ''
+          - - '{{resolve:ssm:/'
+            - !Ref 'MainStackName'
+            - /RegionalLambdaLayerVersionArn}}
+      MemorySize: 128
+      Role: !GetAtt 'GenerateSampleTrafficRole.Arn'
+      Runtime: python3.9
+      Timeout: 900
+      TracingConfig:
+        Mode: PassThrough
+      VpcConfig:
+        SecurityGroupIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /LambdaSecurityGroupId}}
+        SubnetIds:
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrivateSubnetZoneAId}}
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /PrivateSubnetZoneBId}}
+    Type: AWS::Lambda::Function
+  GenerateSampleTrafficLogGroup:
+    DeletionPolicy: Delete
+    DependsOn:
+      - GenerateSampleTraffic
+    Properties:
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'GenerateSampleTraffic'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  GenerateSampleTrafficMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.body')
+            StatusCode: '200'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":400.*
+            StatusCode: '400'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":401.*
+            StatusCode: '401'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":403.*
+            StatusCode: '403'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":404.*
+            StatusCode: '404'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":415.*
+            StatusCode: '415'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":429.*
+            StatusCode: '429'
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: $input.path('$.errorMessage')
+            SelectionPattern: .*"code":500.*
+            StatusCode: '500'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: "#set($params = $input.params())\n{\n\"queryParams\":\
+            \ { #set($paramSet = $params.get('querystring')) #foreach($paramName in\
+            \ $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
+            \ #if($foreach.hasNext),#end #end }\n}"
+        Type: AWS
+        Uri: !Join
+          - ''
+          - - 'arn:aws:apigateway:'
+            - !Ref 'AWS::Region'
+            - :lambda:path/2015-03-31/functions/
+            - !GetAtt 'GenerateSampleTraffic.Arn'
+            - /invocations
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '400'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '401'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '403'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '404'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '415'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '429'
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '500'
+      OperationName: getTrafficGenerator
+      ResourceId: !Ref 'GenerateSampleTrafficResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiId}}
+    Type: AWS::ApiGateway::Method
+  GenerateSampleTrafficMethodInvocationPermission:
+    Condition: ''
+    DependsOn:
+      - GenerateSampleTraffic
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt 'GenerateSampleTraffic.Arn'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ''
+        - - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /ApiId}}
+          - /*/
+          - GET
+          - /
+          - generate-sample-traffic
+    Type: AWS::Lambda::Permission
+  GenerateSampleTrafficResource:
+    Condition: ''
+    DependsOn: []
+    Properties:
+      ParentId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiRootResourceId}}
+      PathPart: generate-sample-traffic
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiId}}
+    Type: AWS::ApiGateway::Resource
+  GenerateSampleTrafficResourceOptionsMethod:
+    Condition: ''
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'''
+              method.response.header.Access-Control-Allow-Methods: '''GET,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: '{}'
+            StatusCode: '200'
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+      ResourceId: !Ref 'GenerateSampleTrafficResource'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiId}}
+    Type: AWS::ApiGateway::Method
+  GenerateSampleTrafficRole:
+    DependsOn: []
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      MaxSessionDuration: 3600
+      Policies: []
+    Type: AWS::IAM::Role
+  GenerateSampleTrafficRoleGenerateTestTraffic:
+    DependsOn:
+      - GenerateSampleTrafficRole
+      - TestTrafficTopic
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - sns:Publish
+            Effect: Allow
+            Resource:
+              - !Ref 'TestTrafficTopic'
+            Sid: SendMessagesToSNS
+      PolicyName: generate-test-traffic
+      Roles:
+        - !Ref 'GenerateSampleTrafficRole'
+    Type: AWS::IAM::Policy
+  TestTrafficTopic:
+    Type: AWS::SNS::Topic
+  TestTrafficTopicPermission:
+    DependsOn:
+      - ClientEmulator
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref 'ClientEmulator'
+      Principal: sns.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Ref 'TestTrafficTopic'
+    Type: AWS::Lambda::Permission

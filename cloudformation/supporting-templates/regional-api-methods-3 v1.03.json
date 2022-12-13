@@ -1,0 +1,2153 @@
+{
+ "Conditions": {
+  "IsFailoverRegion": {
+   "Fn::Not": [
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "PrimaryRegionName"
+      },
+      {
+       "Ref": "AWS::Region"
+      }
+     ]
+    }
+   ]
+  },
+  "IsPrimaryRegion": {
+   "Fn::Equals": [
+    {
+     "Ref": "PrimaryRegionName"
+    },
+    {
+     "Ref": "AWS::Region"
+    }
+   ]
+  }
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [],
+   "ParameterLabels": {}
+  },
+  "Comments": "",
+  "CreatedBy": "Carter Meyers (AWS)",
+  "Description": "This application deploys a Global RDS Aurora cluster.",
+  "LastUpdated": "December 13, 2022",
+  "Version": "v1.03"
+ },
+ "Parameters": {
+  "CodeDownloadUrl": {
+   "Default": "https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main",
+   "Description": "The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.",
+   "Type": "String"
+  },
+  "DatabaseAdminPassword": {
+   "Description": "The password to be used for the RDS Aurora admin account.",
+   "NoEcho": true,
+   "Type": "String"
+  },
+  "DatabaseAdminUsername": {
+   "Description": "The username to be used for the RDS Aurora admin account.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneACidr": {
+   "Default": "10.10.10.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.13.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "FailoverKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneACidr": {
+   "Default": "10.10.9.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneBCidr": {
+   "Default": "10.10.12.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneACidr": {
+   "Default": "10.10.8.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneBCidr": {
+   "Default": "10.10.11.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "FailoverRegionName": {
+   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "FailoverVpcCidr": {
+   "Default": "10.10.8.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "MainStackName": {
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneACidr": {
+   "Default": "10.10.2.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.5.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "PrimaryKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneACidr": {
+   "Default": "10.10.1.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneBCidr": {
+   "Default": "10.10.4.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneACidr": {
+   "Default": "10.10.0.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneBCidr": {
+   "Default": "10.10.3.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "PrimaryRegionName": {
+   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "PrimaryVpcCidr": {
+   "Default": "10.10.0.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "PrivateHostedZoneId": {
+   "Type": "String"
+  },
+  "PublicFqdn": {
+   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB.",
+   "Type": "String"
+  },
+  "PublicHostedZoneId": {
+   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Type": "String"
+  }
+ },
+ "Resources": {
+  "GetClientErrors": {
+   "DependsOn": [
+    "GetClientErrorsRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    curs.execute('''\n        SELECT \n            insertedon, \n            sum(1) \n        FROM dataclient \n        WHERE http_code = 500 \n        GROUP BY insertedon \n        ORDER BY insertedon DESC\n        LIMIT 15\n    ''');\n    client_errors = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n    \n    data_json = \"\"\n    label_json = \"\"\n    \n    data_arr = []\n    label_arr = []\n    \n    #for i in reversed(range(1,len(client_errors))):\n    #    label_arr.append(str(client_errors[i][0]))\n    #    data_arr.append(str(client_errors[i][1]))\n    \n    for r in reversed(client_errors):\n        \n        label_arr.append(str(r[0]))\n        data_arr.append(str(r[1]))\n        \n    if len(label_arr) > 0:\n        \n        for n in range(len(label_arr) + 1, 16):\n            \n            label_arr.insert(0, custom_functions.subtract_five_seconds(label_arr[0]))\n            data_arr.insert(0, '0')\n        \n        custom_functions.add_time(label_arr,data_arr)\n    \n    i =- 1\n    for r in label_arr:\n        i = i + 1\n        if label_json!=\"\":\n            label_json+=\",\"\n        if data_json!=\"\":\n            data_json+=\",\"\n            \n        data_json += data_arr[i]\n        label_json += label_arr[i]\n    \n    return {\n        'code': 200,\n        'body': json.dumps([{\n            'data': data_json,\n            'labels': label_json, \n        }])\n    }"
+    },
+    "Description": "Retrieves client errors from the database",
+    "Environment": {
+     "Variables": {
+      "GLOBAL_DEMO_DB_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/GlobalDemoDbWriterDnsEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_DEMO_DB_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalDemoDbAdminSecretArn}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/RegionalLambdaLayerVersionArn}}"
+       ]
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "GetClientErrorsRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 60,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneAId}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneBId}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "GetClientErrorsLogGroup": {
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "GetClientErrors"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "GetClientErrors"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "GetClientErrorsMethod": {
+   "Condition": "",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.body')"
+       },
+       "StatusCode": "200"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":400.*",
+       "StatusCode": "400"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":401.*",
+       "StatusCode": "401"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":403.*",
+       "StatusCode": "403"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":404.*",
+       "StatusCode": "404"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":415.*",
+       "StatusCode": "415"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":429.*",
+       "StatusCode": "429"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":500.*",
+       "StatusCode": "500"
+      }
+     ],
+     "PassthroughBehavior": "WHEN_NO_TEMPLATES",
+     "RequestTemplates": {
+      "application/json": "#set($params = $input.params())\n{\n\"queryParams\": { #set($paramSet = $params.get('querystring')) #foreach($paramName in $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\" #if($foreach.hasNext),#end #end }\n}"
+     },
+     "Type": "AWS",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "GetClientErrors",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "MethodResponses": [
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "200"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "400"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "401"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "403"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "404"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "415"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "429"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "500"
+     }
+    ],
+    "OperationName": "getClientErrors",
+    "ResourceId": {
+     "Ref": "GetClientErrorsResource"
+    },
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Method"
+  },
+  "GetClientErrorsMethodInvocationPermission": {
+   "Condition": "",
+   "DependsOn": [
+    "GetClientErrors"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "GetClientErrors",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Fn::Join": [
+         "",
+         [
+          "{{resolve:ssm:/",
+          {
+           "Ref": "MainStackName"
+          },
+          "/ApiId}}"
+         ]
+        ]
+       },
+       "/*/",
+       "GET",
+       "/",
+       "get-client-errors"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "GetClientErrorsResource": {
+   "Condition": "",
+   "DependsOn": [],
+   "Properties": {
+    "ParentId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiRootResourceId}}"
+      ]
+     ]
+    },
+    "PathPart": "get-client-errors",
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Resource"
+  },
+  "GetClientErrorsResourceOptionsMethod": {
+   "Condition": "",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "{}"
+       },
+       "StatusCode": "200"
+      }
+     ],
+     "PassthroughBehavior": "WHEN_NO_TEMPLATES",
+     "RequestTemplates": {
+      "application/json": "{\"statusCode\": 200}"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "200"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "GetClientErrorsResource"
+    },
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Method"
+  },
+  "GetClientErrorsRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalAppDbAdminSecretArn}}"
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalDemoDbAdminSecretArn}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKmsKeyArn"
+            },
+            {
+             "Ref": "FailoverKmsKeyArn"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        }
+       ]
+      },
+      "PolicyName": "database-secret-retrieval"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "GetClientTraffic": {
+   "DependsOn": [
+    "GetClientTrafficRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\t\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\t\nfrom datetime import timedelta\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n    \n    if event['queryParams']['region'] not in ['primary', 'failover']:\n        raise Exception('Invalid Region Specified')\n        \n    curs = db_conn.cursor()\t\n    \n    curs.execute('''\n        SELECT\n            insertedon, \n            sum(1) \n        FROM dataclient \n        WHERE http_code = 200 and {}_region = 1\n        GROUP BY insertedon \n        ORDER BY insertedon \n        DESC limit 15\n    '''.format(event['queryParams']['region']))\n    \n    traffic_records = curs.fetchall()\n    \n    curs.close()\t\n    db_conn.close()\n    \n    data_json = \"\"\n    label_json = \"\"\n    \t\n    data_arr = []\t\n    label_arr = []\t\n    \t\n    for i in reversed(range(1, len(traffic_records))):\t\n        \n        data_arr.append(str(traffic_records[i][1]))\t\n        label_arr.append(str(traffic_records[i][0]))\t\n    \t\n    #for r in reversed(traffic_records):\t\n    #    label_arr.append(str(r[0]))\t\n    #    data_arr.append(str(r[1]))\t\n        \t\n    if len(label_arr) > 0:\n        \n        for n in range(len(label_arr) + 1, 16):\t\n            \n            data_arr.insert(0, '0')\n            label_arr.insert(0, custom_functions.subtract_five_seconds(label_arr[0]))\t\n        \t\n        custom_functions.add_time(label_arr,data_arr)\t\n    \t\n    i =- 1\t\n    for r in label_arr:\t\n        i = i + 1\t\n        if label_json != \"\":\t\n            label_json += \",\"\t\n        if data_json != \"\":\t\n            data_json += \",\"\t\n            \t\n        data_json += data_arr[i]\t\n        label_json += label_arr[i]\t\n    \t\n    return {\n        'code': 200,\n        'body': json.dumps([{\n            'data': data_json,\n            'labels': label_json,\n        }])\n    }\t"
+    },
+    "Description": "Retrieves client traffic logs from the database",
+    "Environment": {
+     "Variables": {
+      "GLOBAL_DEMO_DB_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/GlobalDemoDbWriterDnsEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_DEMO_DB_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalDemoDbAdminSecretArn}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/RegionalLambdaLayerVersionArn}}"
+       ]
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "GetClientTrafficRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 60,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneAId}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneBId}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "GetClientTrafficLogGroup": {
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "GetClientTraffic"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "GetClientTraffic"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "GetClientTrafficMethod": {
+   "Condition": "",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.body')"
+       },
+       "StatusCode": "200"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":400.*",
+       "StatusCode": "400"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":401.*",
+       "StatusCode": "401"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":403.*",
+       "StatusCode": "403"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":404.*",
+       "StatusCode": "404"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":415.*",
+       "StatusCode": "415"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":429.*",
+       "StatusCode": "429"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":500.*",
+       "StatusCode": "500"
+      }
+     ],
+     "PassthroughBehavior": "WHEN_NO_TEMPLATES",
+     "RequestTemplates": {
+      "application/json": "#set($params = $input.params())\n{\n\"queryParams\": { #set($paramSet = $params.get('querystring')) #foreach($paramName in $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\" #if($foreach.hasNext),#end #end }\n}"
+     },
+     "Type": "AWS",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "GetClientTraffic",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "MethodResponses": [
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "200"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "400"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "401"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "403"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "404"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "415"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "429"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "500"
+     }
+    ],
+    "OperationName": "getClientTraffic",
+    "ResourceId": {
+     "Ref": "GetClientTrafficResource"
+    },
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Method"
+  },
+  "GetClientTrafficMethodInvocationPermission": {
+   "Condition": "",
+   "DependsOn": [
+    "GetClientTraffic"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "GetClientTraffic",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Fn::Join": [
+         "",
+         [
+          "{{resolve:ssm:/",
+          {
+           "Ref": "MainStackName"
+          },
+          "/ApiId}}"
+         ]
+        ]
+       },
+       "/*/",
+       "GET",
+       "/",
+       "get-client-traffic"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "GetClientTrafficResource": {
+   "Condition": "",
+   "DependsOn": [],
+   "Properties": {
+    "ParentId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiRootResourceId}}"
+      ]
+     ]
+    },
+    "PathPart": "get-client-traffic",
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Resource"
+  },
+  "GetClientTrafficResourceOptionsMethod": {
+   "Condition": "",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "{}"
+       },
+       "StatusCode": "200"
+      }
+     ],
+     "PassthroughBehavior": "WHEN_NO_TEMPLATES",
+     "RequestTemplates": {
+      "application/json": "{\"statusCode\": 200}"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "200"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "GetClientTrafficResource"
+    },
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Method"
+  },
+  "GetClientTrafficRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalAppDbAdminSecretArn}}"
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalDemoDbAdminSecretArn}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKmsKeyArn"
+            },
+            {
+             "Ref": "FailoverKmsKeyArn"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        }
+       ]
+      },
+      "PolicyName": "database-secret-retrieval"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "ResetDemoEnvironment": {
+   "Condition": "IsPrimaryRegion",
+   "DependsOn": [
+    "ResetDemoEnvironmentRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "_G='PRIVATE_HOSTED_ZONE_ID'\n_F='WRITER'\n_E='READER'\n_D=False\n_C='PUBLIC_FQDN'\n_B='_ENDPOINT'\n_A=True\nimport sys\nsys.path.append('/opt')\nimport os,json,boto3,psycopg2,dateutil.tz,multi_region_db\nfrom datetime import datetime\nfrom botocore.exceptions import ClientError as boto3_client_error\ncustom_functions=multi_region_db.Functions()\nevent_bridge_client=ec2_client=boto3.client('events',region_name=os.environ['FAILOVER_REGION_NAME'])\ndef point_service_fqdn_to_primary_web_alb():\n\tA=boto3.client('route53')\n\ttry:A.change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':os.environ[_C],'AliasTarget':{'DNSName':os.environ['REGIONAL_WEB_ALB_FQDN'],'HostedZoneId':os.environ['REGIONAL_WEB_ALB_HOSTED_ZONE_ID'],'EvaluateTargetHealth':_D},'Type':'A'}}]},HostedZoneId=os.environ['PUBLIC_HOSTED_ZONE_ID'])\n\texcept boto3_client_error as B:raise Exception('Failed to Update DNS Record: '+str(B))\n\treturn _A\ndef point_global_app_db_endpoints_to_primary_proxy():\n\tfor A in [_E,_F]:custom_functions.update_dns_record(fqdn=os.environ['GLOBAL_APP_DB_'+A+_B],new_value=os.environ['REGIONAL_APP_DB_PROXY_'+A+_B],hosted_zone_id=os.environ[_G])\ndef point_global_app_db_cluster_endpoints_to_primary_cluster():\n\tfor A in [_E,_F]:custom_functions.update_dns_record(fqdn='db.cluster.'+A+'.'+os.environ[_C]+'.internal',new_value=os.environ['REGIONAL_APP_DB_CLUSTER_'+A+_B],hosted_zone_id=os.environ[_G])\ndef allow_traffic_to_primary_db_cluster():\n\tA=boto3.client('ec2')\n\ttry:A.replace_network_acl_entry(Egress=_D,Protocol='-1',CidrBlock='0.0.0.0/0',RuleAction='allow',RuleNumber=100,NetworkAclId=os.environ['REGIONAL_APP_DB_NACL_ID'])\n\texcept boto3_client_error as B:raise Exception('Failed to Reset NACL: '+str(B))\ndef prune_db_tables(db_identifier,table_names):\n\tC=db_identifier;A=custom_functions.get_db_credentials(C);B=psycopg2.connect(host=os.environ['GLOBAL_'+C.upper()+'_DB_WRITER_ENDPOINT'],port=A['port'],user=A['username'],sslmode='require',password=A['password'],database=A['database'],connect_timeout=3)\n\tfor E in table_names:D=B.cursor();D.execute('DELETE FROM '+E);B.commit()\n\tD.close();B.close();return _A\ndef disable_proxy_monitor_rule():\n\ttry:event_bridge_client.disable_rule(Name=os.environ['PROXY_MONITOR_CRON_NAME'])\n\texcept boto3_client_error as A:raise Exception('Failed to Disable Proxy Monitor Rule: '+str(A))\n\treturn _A\ndef enable_database_canary_rule():\n\ttry:event_bridge_client.enable_rule(Name=os.environ['DATABASE_CANARY_CRON_NAME'])\n\texcept boto3_client_error as A:raise Exception('Failed to Enable Database Canary Rule: '+str(A))\n\treturn _A\n'\\n    It is expected that this function will be run in the PRIMARY AWS region\\n'\ndef handler(event,context):allow_traffic_to_primary_db_cluster();prune_db_tables('App',['dataserver']);prune_db_tables('Demo',['dataclient','failoverevents']);disable_proxy_monitor_rule();enable_database_canary_rule();point_service_fqdn_to_primary_web_alb();point_global_app_db_endpoints_to_primary_proxy();point_global_app_db_cluster_endpoints_to_primary_cluster();return{'code':200,'body':json.dumps([])}"
+    },
+    "Description": "Resets the demo environment",
+    "Environment": {
+     "Variables": {
+      "DATABASE_CANARY_CRON_NAME": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Ref": "MainStackName"
+         },
+         "-database-canary"
+        ]
+       ]
+      },
+      "FAILOVER_REGION_NAME": {
+       "Ref": "FailoverRegionName"
+      },
+      "GLOBAL_APP_DB_READER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/GlobalAppDbReaderDnsEndpoint}}"
+        ]
+       ]
+      },
+      "GLOBAL_APP_DB_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/GlobalAppDbWriterDnsEndpoint}}"
+        ]
+       ]
+      },
+      "GLOBAL_DEMO_DB_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/GlobalDemoDbWriterDnsEndpoint}}"
+        ]
+       ]
+      },
+      "PRIVATE_HOSTED_ZONE_ID": {
+       "Ref": "PrivateHostedZoneId"
+      },
+      "PROXY_MONITOR_CRON_NAME": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Ref": "MainStackName"
+         },
+         "-database-proxy-monitor"
+        ]
+       ]
+      },
+      "PUBLIC_FQDN": {
+       "Ref": "PublicFqdn"
+      },
+      "PUBLIC_HOSTED_ZONE_ID": {
+       "Ref": "PublicHostedZoneId"
+      },
+      "REGIONAL_APP_DB_CLUSTER_READER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalAppDbClusterReaderEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalAppDbClusterWriterEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_APP_DB_NACL_ID": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalAppDatabaseNaclId}}"
+        ]
+       ]
+      },
+      "REGIONAL_APP_DB_PROXY_READER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/",
+         "RegionalAppDbProxyReaderEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_APP_DB_PROXY_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/",
+         "RegionalAppDbProxyWriterEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_APP_DB_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalAppDbAdminSecretArn}}"
+        ]
+       ]
+      },
+      "REGIONAL_DEMO_DB_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalDemoDbAdminSecretArn}}"
+        ]
+       ]
+      },
+      "REGIONAL_WEB_ALB_FQDN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/WebLoadBalancerFqdn}}"
+        ]
+       ]
+      },
+      "REGIONAL_WEB_ALB_HOSTED_ZONE_ID": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/WebLoadBalancerHostedZoneId}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/RegionalLambdaLayerVersionArn}}"
+       ]
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "ResetDemoEnvironmentRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 60,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneAId}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneBId}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "ResetDemoEnvironmentLogGroup": {
+   "Condition": "IsPrimaryRegion",
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "ResetDemoEnvironment"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "ResetDemoEnvironment"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "ResetDemoEnvironmentMethod": {
+   "Condition": "IsPrimaryRegion",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.body')"
+       },
+       "StatusCode": "200"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":400.*",
+       "StatusCode": "400"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":401.*",
+       "StatusCode": "401"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":403.*",
+       "StatusCode": "403"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":404.*",
+       "StatusCode": "404"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":415.*",
+       "StatusCode": "415"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":429.*",
+       "StatusCode": "429"
+      },
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "$input.path('$.errorMessage')"
+       },
+       "SelectionPattern": ".*\"code\":500.*",
+       "StatusCode": "500"
+      }
+     ],
+     "PassthroughBehavior": "WHEN_NO_TEMPLATES",
+     "RequestTemplates": {
+      "application/json": "#set($params = $input.params())\n{\n\"queryParams\": { #set($paramSet = $params.get('querystring')) #foreach($paramName in $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\" #if($foreach.hasNext),#end #end }\n}"
+     },
+     "Type": "AWS",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ResetDemoEnvironment",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "MethodResponses": [
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "200"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "400"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "401"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "403"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "404"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "415"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "429"
+     },
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "500"
+     }
+    ],
+    "OperationName": "getResetDemoEnvironment",
+    "ResourceId": {
+     "Ref": "ResetDemoEnvironmentResource"
+    },
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Method"
+  },
+  "ResetDemoEnvironmentMethodInvocationPermission": {
+   "Condition": "IsPrimaryRegion",
+   "DependsOn": [
+    "ResetDemoEnvironment"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ResetDemoEnvironment",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Fn::Join": [
+         "",
+         [
+          "{{resolve:ssm:/",
+          {
+           "Ref": "MainStackName"
+          },
+          "/ApiId}}"
+         ]
+        ]
+       },
+       "/*/",
+       "GET",
+       "/",
+       "reset-demo-environment"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "ResetDemoEnvironmentResource": {
+   "Condition": "IsPrimaryRegion",
+   "DependsOn": [],
+   "Properties": {
+    "ParentId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiRootResourceId}}"
+      ]
+     ]
+    },
+    "PathPart": "reset-demo-environment",
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Resource"
+  },
+  "ResetDemoEnvironmentResourceOptionsMethod": {
+   "Condition": "IsPrimaryRegion",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'"
+       },
+       "ResponseTemplates": {
+        "application/json": "{}"
+       },
+       "StatusCode": "200"
+      }
+     ],
+     "PassthroughBehavior": "WHEN_NO_TEMPLATES",
+     "RequestTemplates": {
+      "application/json": "{\"statusCode\": 200}"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseModels": {
+       "application/json": "Empty"
+      },
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Methods": true,
+       "method.response.header.Access-Control-Allow-Origin": true
+      },
+      "StatusCode": "200"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "ResetDemoEnvironmentResource"
+    },
+    "RestApiId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/ApiId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::ApiGateway::Method"
+  },
+  "ResetDemoEnvironmentRole": {
+   "Condition": "IsPrimaryRegion",
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalAppDbAdminSecretArn}}"
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalDemoDbAdminSecretArn}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKmsKeyArn"
+            },
+            {
+             "Ref": "FailoverKmsKeyArn"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        }
+       ]
+      },
+      "PolicyName": "database-secret-retrieval"
+     },
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "ec2:ReplaceNetworkAclEntry"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:ec2:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":network-acl/",
+             {
+              "Fn::Join": [
+               "",
+               [
+                "{{resolve:ssm:/",
+                {
+                 "Ref": "MainStackName"
+                },
+                "/RegionalAppDatabaseNaclId}}"
+               ]
+              ]
+             }
+            ]
+           ]
+          }
+         ],
+         "Sid": "UpdateACLEntry"
+        },
+        {
+         "Action": [
+          "events:EnableRule",
+          "events:DisableRule"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:events:",
+             {
+              "Ref": "FailoverRegionName"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":rule/",
+             {
+              "Fn::Join": [
+               "",
+               [
+                {
+                 "Ref": "MainStackName"
+                },
+                "-database-canary"
+               ]
+              ]
+             }
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:events:",
+             {
+              "Ref": "FailoverRegionName"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":rule/",
+             {
+              "Fn::Join": [
+               "",
+               [
+                {
+                 "Ref": "MainStackName"
+                },
+                "-database-proxy-monitor"
+               ]
+              ]
+             }
+            ]
+           ]
+          }
+         ],
+         "Sid": "ManageCrons"
+        },
+        {
+         "Action": [
+          "route53:ChangeResourceRecordSets"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:route53:::hostedzone/",
+             {
+              "Ref": "PublicHostedZoneId"
+             }
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:route53:::hostedzone/",
+             {
+              "Ref": "PrivateHostedZoneId"
+             }
+            ]
+           ]
+          }
+         ],
+         "Sid": "UpdateR53HostedZone"
+        }
+       ]
+      },
+      "PolicyName": "custom-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  }
+ }
+}

@@ -1,0 +1,733 @@
+{
+ "Conditions": {
+  "IsFailoverRegion": {
+   "Fn::Not": [
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "PrimaryRegionName"
+      },
+      {
+       "Ref": "AWS::Region"
+      }
+     ]
+    }
+   ]
+  },
+  "IsPrimaryRegion": {
+   "Fn::Equals": [
+    {
+     "Ref": "PrimaryRegionName"
+    },
+    {
+     "Ref": "AWS::Region"
+    }
+   ]
+  }
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [],
+   "ParameterLabels": {}
+  },
+  "Comments": "",
+  "CreatedBy": "Carter Meyers (AWS)",
+  "Description": "This application deploys a Global RDS Aurora cluster.",
+  "LastUpdated": "December 13, 2022",
+  "Version": "v1.03"
+ },
+ "Outputs": {
+  "WebLoadBalancerFqdn": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "Alb",
+     "DNSName"
+    ]
+   }
+  },
+  "WebLoadBalancerHostedZoneId": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "Alb",
+     "CanonicalHostedZoneID"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "CodeDownloadUrl": {
+   "Default": "https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main",
+   "Description": "The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.",
+   "Type": "String"
+  },
+  "DatabaseAdminPassword": {
+   "Description": "The password to be used for the RDS Aurora admin account.",
+   "NoEcho": true,
+   "Type": "String"
+  },
+  "DatabaseAdminUsername": {
+   "Description": "The username to be used for the RDS Aurora admin account.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneACidr": {
+   "Default": "10.10.10.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.13.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "FailoverKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneACidr": {
+   "Default": "10.10.9.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneBCidr": {
+   "Default": "10.10.12.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneACidr": {
+   "Default": "10.10.8.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneBCidr": {
+   "Default": "10.10.11.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "FailoverRegionName": {
+   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "FailoverVpcCidr": {
+   "Default": "10.10.8.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "MainStackName": {
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneACidr": {
+   "Default": "10.10.2.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.5.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "PrimaryKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneACidr": {
+   "Default": "10.10.1.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneBCidr": {
+   "Default": "10.10.4.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneACidr": {
+   "Default": "10.10.0.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneBCidr": {
+   "Default": "10.10.3.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "PrimaryRegionName": {
+   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "PrimaryVpcCidr": {
+   "Default": "10.10.0.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "PrivateHostedZoneId": {
+   "Type": "String"
+  },
+  "PublicFqdn": {
+   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB.",
+   "Type": "String"
+  },
+  "PublicHostedZoneId": {
+   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Type": "String"
+  }
+ },
+ "Resources": {
+  "Alb": {
+   "DependsOn": [
+    "AlbSecurityGroup"
+   ],
+   "Properties": {
+    "IpAddressType": "ipv4",
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Ref": "AlbSecurityGroup"
+     }
+    ],
+    "Subnets": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/PublicSubnetZoneAId}}"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/PublicSubnetZoneBId}}"
+       ]
+      ]
+     }
+    ],
+    "Type": "application"
+   },
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
+  },
+  "AlbDnsDeleter": {
+   "Condition": "IsPrimaryRegion",
+   "Properties": {
+    "Properties": {
+     "Fqdns": [
+      {
+       "Ref": "PublicFqdn"
+      }
+     ],
+     "HostedZoneId": {
+      "Ref": "PublicHostedZoneId"
+     }
+    },
+    "ServiceToken": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/RegionalDnsRecordDeleterArn}}"
+      ]
+     ]
+    },
+    "Type": "Custom::DeployLambdaLayer",
+    "Version": "1.0"
+   },
+   "Type": "AWS::CloudFormation::CustomResource"
+  },
+  "AlbSecurityGroup": {
+   "Properties": {
+    "GroupDescription": "ALB Security Group",
+    "SecurityGroupEgress": [],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "IPv4 HTTP Access from Internet",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "IPv4 HTTP Access from Internet",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/RegionalVpcId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::EC2::SecurityGroup"
+  },
+  "DnsRecord": {
+   "Condition": "IsPrimaryRegion",
+   "DeletionPolicy": "Retain",
+   "DependsOn": [
+    "Alb"
+   ],
+   "Properties": {
+    "HostedZoneId": {
+     "Ref": "PublicHostedZoneId"
+    },
+    "RecordSets": [
+     {
+      "AliasTarget": {
+       "DNSName": {
+        "Fn::GetAtt": [
+         "Alb",
+         "DNSName"
+        ]
+       },
+       "EvaluateTargetHealth": false,
+       "HostedZoneId": {
+        "Fn::GetAtt": [
+         "Alb",
+         "CanonicalHostedZoneID"
+        ]
+       }
+      },
+      "Name": {
+       "Ref": "PublicFqdn"
+      },
+      "Type": "A"
+     }
+    ]
+   },
+   "Type": "AWS::Route53::RecordSetGroup"
+  },
+  "Port443AlbListener": {
+   "DependsOn": [
+    "TlsCertificate",
+    "WebsiteTargetGroup"
+   ],
+   "Properties": {
+    "Certificates": [
+     {
+      "CertificateArn": {
+       "Ref": "TlsCertificate"
+      }
+     }
+    ],
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "WebsiteTargetGroup"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "Alb"
+    },
+    "Port": 443,
+    "Protocol": "HTTPS"
+   },
+   "Type": "AWS::ElasticLoadBalancingV2::Listener"
+  },
+  "Port80AlbListener": {
+   "DependsOn": [
+    "Alb"
+   ],
+   "Properties": {
+    "DefaultActions": [
+     {
+      "RedirectConfig": {
+       "Host": "#{host}",
+       "Path": "/#{path}",
+       "Port": "443",
+       "Protocol": "HTTPS",
+       "Query": "#{query}",
+       "StatusCode": "HTTP_301"
+      },
+      "Type": "redirect"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "Alb"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Type": "AWS::ElasticLoadBalancingV2::Listener"
+  },
+  "TlsCertificate": {
+   "Properties": {
+    "DomainName": {
+     "Ref": "PublicFqdn"
+    },
+    "DomainValidationOptions": [
+     {
+      "DomainName": {
+       "Ref": "PublicFqdn"
+      },
+      "HostedZoneId": {
+       "Ref": "PublicHostedZoneId"
+      }
+     }
+    ],
+    "ValidationMethod": "DNS"
+   },
+   "Type": "AWS::CertificateManager::Certificate"
+  },
+  "WebLoadBalancerFqdnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "ALB FQDN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "WebLoadBalancerFqdn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "Alb",
+      "DNSName"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "WebLoadBalancerHostedZoneIdParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "ALB Hosted Zone ID for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "WebLoadBalancerHostedZoneId"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "Alb",
+      "CanonicalHostedZoneID"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "Website": {
+   "DependsOn": [
+    "WebsiteRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport datetime\nimport psycopg2\nimport dateutil.tz\nimport multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    http_status_code = 200\n    \n    try: \n        \n        guid = event['queryStringParameters']['guid']\n\n        eastern = dateutil.tz.gettz('US/Eastern')\n\n        sql_statement = \"INSERT INTO dataserver (guid, insertedon) VALUES ('\" + str(guid) + \"','\" + datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"') RETURNING id\"\n        \n        app_db_credentials = custom_functions.get_db_credentials('App')\n        \n        db_conn = psycopg2.connect(\n            host = os.environ['GLOBAL_APP_DB_WRITER_ENDPOINT'],\n            port = app_db_credentials['port'],\n            user = app_db_credentials['username'],\n            password = app_db_credentials['password'],\n            database = app_db_credentials['database'],\n            connect_timeout = 3,\n            sslmode = 'require',\n        )\n        \n        id = 0\n        http_status_code = 200\n        curs = db_conn.cursor()\n        curs.execute(sql_statement)\n        id = curs.fetchone()[0]\n        print(id)\n        db_conn.commit()\n        curs.close()\n        db_conn.close()\n        \n    except Exception as e:\n        http_status_code = 500\n        print(e)\n        \n    return {\n        'statusCode': http_status_code,\n        'headers': {\n            'Content-Type': 'text/html'\n        },\n        'body': os.environ['AWS_REGION']\n    }"
+    },
+    "Description": "Serves as the root handler behind the Web ALB",
+    "Environment": {
+     "Variables": {
+      "GLOBAL_APP_DB_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/GlobalAppDbWriterDnsEndpoint}}"
+        ]
+       ]
+      },
+      "REGIONAL_APP_DB_SECRET_ARN": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalAppDbAdminSecretArn}}"
+        ]
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/RegionalLambdaLayerVersionArn}}"
+       ]
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "WebsiteRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 15,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneAId}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneBId}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "WebsiteLogGroup": {
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "Website"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "Website"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "WebsiteRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalAppDbAdminSecretArn}}"
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalDemoDbAdminSecretArn}}"
+            ]
+           ]
+          }
+         ],
+         "Sid": "GetRDSAdminSecret"
+        },
+        {
+         "Action": [
+          "kms:Decrypt"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::If": [
+            "IsPrimaryRegion",
+            {
+             "Ref": "PrimaryKmsKeyArn"
+            },
+            {
+             "Ref": "FailoverKmsKeyArn"
+            }
+           ]
+          }
+         ],
+         "Sid": "DecryptWithKMS"
+        }
+       ]
+      },
+      "PolicyName": "database-secret-retrieval"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "WebsiteTargetGroup": {
+   "DependsOn": [
+    "Website",
+    "WebsiteTargetGroupPermission"
+   ],
+   "Properties": {
+    "HealthCheckEnabled": false,
+    "Matcher": {
+     "HttpCode": "200"
+    },
+    "TargetType": "lambda",
+    "Targets": [
+     {
+      "Id": {
+       "Fn::GetAtt": [
+        "Website",
+        "Arn"
+       ]
+      }
+     }
+    ]
+   },
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
+  },
+  "WebsiteTargetGroupPermission": {
+   "DependsOn": [
+    "Website"
+   ],
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Ref": "Website"
+    },
+    "Principal": "elasticloadbalancing.amazonaws.com",
+    "SourceAccount": {
+     "Ref": "AWS::AccountId"
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  }
+ }
+}

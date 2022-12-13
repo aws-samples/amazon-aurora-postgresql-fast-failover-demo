@@ -1,0 +1,1994 @@
+{
+ "Conditions": {
+  "IsFailoverRegion": {
+   "Fn::Not": [
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "PrimaryRegionName"
+      },
+      {
+       "Ref": "AWS::Region"
+      }
+     ]
+    }
+   ]
+  },
+  "IsPrimaryRegion": {
+   "Fn::Equals": [
+    {
+     "Ref": "PrimaryRegionName"
+    },
+    {
+     "Ref": "AWS::Region"
+    }
+   ]
+  }
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [],
+   "ParameterLabels": {}
+  },
+  "Comments": "",
+  "CreatedBy": "Carter Meyers (AWS)",
+  "Description": "This application deploys a Global RDS Aurora cluster.",
+  "LastUpdated": "December 13, 2022",
+  "Version": "v1.03"
+ },
+ "Outputs": {
+  "GlobalAppDbClusterIdentifier": {
+   "Condition": "",
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "GlobalAppDbClusterIdentifier"
+      ]
+     ]
+    }
+   },
+   "Value": {
+    "Fn::GetAtt": [
+     "PrimaryRegionDbExportRetriever",
+     "GlobalAppDbClusterIdentifier"
+    ]
+   }
+  },
+  "GlobalAppDbReaderDnsEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "app",
+      ".db.reader.",
+      {
+       "Ref": "PublicFqdn"
+      },
+      ".internal"
+     ]
+    ]
+   }
+  },
+  "GlobalAppDbWriterDnsEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "app",
+      ".db.writer.",
+      {
+       "Ref": "PublicFqdn"
+      },
+      ".internal"
+     ]
+    ]
+   }
+  },
+  "GlobalDemoDbReaderDnsEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "demo",
+      ".db.reader.",
+      {
+       "Ref": "PublicFqdn"
+      },
+      ".internal"
+     ]
+    ]
+   }
+  },
+  "GlobalDemoDbWriterDnsEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "demo",
+      ".db.writer.",
+      {
+       "Ref": "PublicFqdn"
+      },
+      ".internal"
+     ]
+    ]
+   }
+  },
+  "RegionalAppDbAdminSecretArn": {
+   "Condition": "",
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "AppDbAdminSecretArn"
+      ]
+     ]
+    }
+   },
+   "Value": {
+    "Ref": "AppDbAdminSecret"
+   }
+  },
+  "RegionalAppDbClusterArn": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "FailoverAppCluster",
+     "DBClusterArn"
+    ]
+   }
+  },
+  "RegionalAppDbClusterIdentifier": {
+   "Condition": "",
+   "Value": {
+    "Ref": "FailoverAppCluster"
+   }
+  },
+  "RegionalAppDbClusterReaderEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "FailoverAppCluster",
+     "ReadEndpoint.Address"
+    ]
+   }
+  },
+  "RegionalAppDbClusterWriterEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "FailoverAppCluster",
+     "Endpoint.Address"
+    ]
+   }
+  },
+  "RegionalAppDbProxyArn": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "AppDbProxy",
+     "DBProxyArn"
+    ]
+   }
+  },
+  "RegionalAppDbProxyName": {
+   "Condition": "",
+   "Value": {
+    "Ref": "AppDbProxy"
+   }
+  },
+  "RegionalAppDbProxyPort": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "FailoverAppCluster",
+     "Endpoint.Port"
+    ]
+   }
+  },
+  "RegionalAppDbProxyReaderEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "AppDbProxyReaderEndpoint",
+     "Endpoint"
+    ]
+   }
+  },
+  "RegionalAppDbProxyWriterEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "AppDbProxy",
+     "Endpoint"
+    ]
+   }
+  },
+  "RegionalDemoDbAdminSecretArn": {
+   "Condition": "",
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "DemoDbAdminSecretArn"
+      ]
+     ]
+    }
+   },
+   "Value": {
+    "Fn::Join": [
+     ":",
+     [
+      "arn",
+      {
+       "Ref": "AWS::Partition"
+      },
+      "secretsmanager",
+      {
+       "Ref": "AWS::Region"
+      },
+      {
+       "Ref": "AWS::AccountId"
+      },
+      "secret",
+      {
+       "Fn::Select": [
+        6,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "PrimaryRegionDbExportRetriever",
+            "DemoDbAdminSecretArn"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "CodeDownloadUrl": {
+   "Default": "https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main",
+   "Description": "The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.",
+   "Type": "String"
+  },
+  "DatabaseAdminPassword": {
+   "Description": "The password to be used for the RDS Aurora admin account.",
+   "NoEcho": true,
+   "Type": "String"
+  },
+  "DatabaseAdminUsername": {
+   "Description": "The username to be used for the RDS Aurora admin account.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneACidr": {
+   "Default": "10.10.10.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.13.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "FailoverKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneACidr": {
+   "Default": "10.10.9.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneBCidr": {
+   "Default": "10.10.12.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneACidr": {
+   "Default": "10.10.8.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneBCidr": {
+   "Default": "10.10.11.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "FailoverRegionName": {
+   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "FailoverVpcCidr": {
+   "Default": "10.10.8.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "MainStackName": {
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneACidr": {
+   "Default": "10.10.2.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.5.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "PrimaryKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneACidr": {
+   "Default": "10.10.1.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneBCidr": {
+   "Default": "10.10.4.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneACidr": {
+   "Default": "10.10.0.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneBCidr": {
+   "Default": "10.10.3.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "PrimaryRegionName": {
+   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "PrimaryVpcCidr": {
+   "Default": "10.10.0.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "PrivateHostedZoneId": {
+   "Type": "String"
+  },
+  "PublicFqdn": {
+   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB.",
+   "Type": "String"
+  },
+  "PublicHostedZoneId": {
+   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Type": "String"
+  }
+ },
+ "Resources": {
+  "AppDbAdminSecret": {
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Failover App DB Cluster Admin Account for ",
+       {
+        "Ref": "MainStackName"
+       }
+      ]
+     ]
+    },
+    "KmsKeyId": {
+     "Fn::If": [
+      "IsPrimaryRegion",
+      {
+       "Ref": "PrimaryKmsKeyArn"
+      },
+      {
+       "Ref": "FailoverKmsKeyArn"
+      }
+     ]
+    },
+    "SecretString": {
+     "Fn::Join": [
+      "",
+      [
+       "{\"username\": \"",
+       {
+        "Ref": "DatabaseAdminUsername"
+       },
+       "\", \"password\": \"",
+       {
+        "Ref": "DatabaseAdminPassword"
+       },
+       "\", \"database\": \"template1\"}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::SecretsManager::Secret"
+  },
+  "AppDbClusterDeleter": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "AppDbSubnetGroup",
+    "FailoverAppCluster",
+    "RdsClusterDeleterLogGroup"
+   ],
+   "Properties": {
+    "Properties": {
+     "ClusterArn": {
+      "Fn::GetAtt": [
+       "FailoverAppCluster",
+       "DBClusterArn"
+      ]
+     },
+     "ClusterIdentifier": {
+      "Ref": "FailoverAppCluster"
+     }
+    },
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "RdsClusterDeleter",
+      "Arn"
+     ]
+    },
+    "Type": "Custom::DeleteRdsCluster",
+    "Version": "1.0"
+   },
+   "Type": "AWS::CloudFormation::CustomResource"
+  },
+  "AppDbProxy": {
+   "Properties": {
+    "Auth": [
+     {
+      "SecretArn": {
+       "Ref": "AppDbAdminSecret"
+      }
+     }
+    ],
+    "DBProxyName": {
+     "Ref": "FailoverAppCluster"
+    },
+    "EngineFamily": "POSTGRESQL",
+    "RequireTLS": true,
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "DbProxyRole",
+      "Arn"
+     ]
+    },
+    "VpcSecurityGroupIds": [
+     {
+      "Ref": "DbProxySecurityGroup"
+     }
+    ],
+    "VpcSubnetIds": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/DatabaseSubnetZoneAId}}"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/DatabaseSubnetZoneBId}}"
+       ]
+      ]
+     }
+    ]
+   },
+   "Type": "AWS::RDS::DBProxy"
+  },
+  "AppDbProxyReaderEndpoint": {
+   "DependsOn": [
+    "AppDbProxy"
+   ],
+   "Properties": {
+    "DBProxyEndpointName": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "app",
+       "reader"
+      ]
+     ]
+    },
+    "DBProxyName": {
+     "Ref": "AppDbProxy"
+    },
+    "TargetRole": "READ_ONLY",
+    "VpcSecurityGroupIds": [
+     {
+      "Ref": "DbProxySecurityGroup"
+     }
+    ],
+    "VpcSubnetIds": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/DatabaseSubnetZoneAId}}"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/DatabaseSubnetZoneBId}}"
+       ]
+      ]
+     }
+    ]
+   },
+   "Type": "AWS::RDS::DBProxyEndpoint"
+  },
+  "AppDbProxyTargetGroup": {
+   "Condition": "IsPrimaryRegion",
+   "DependsOn": [
+    "AppDbProxy",
+    "FailoverAppInstance1"
+   ],
+   "Properties": {
+    "DBClusterIdentifiers": [
+     {
+      "Ref": "FailoverAppCluster"
+     }
+    ],
+    "DBProxyName": {
+     "Ref": "AppDbProxy"
+    },
+    "TargetGroupName": "default"
+   },
+   "Type": "AWS::RDS::DBProxyTargetGroup"
+  },
+  "AppDbSubnetGroup": {
+   "Properties": {
+    "DBSubnetGroupDescription": "App Database Subnets",
+    "DBSubnetGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "AWS::StackName"
+       },
+       {
+        "Fn::Join": [
+         "",
+         {
+          "Fn::Split": [
+           "subnet-",
+           {
+            "Fn::Join": [
+             "-",
+             [
+              {
+               "Fn::Join": [
+                "",
+                [
+                 "{{resolve:ssm:/",
+                 {
+                  "Ref": "MainStackName"
+                 },
+                 "/",
+                 "Database",
+                 "SubnetZoneAId}}"
+                ]
+               ]
+              },
+              {
+               "Fn::Join": [
+                "",
+                [
+                 "{{resolve:ssm:/",
+                 {
+                  "Ref": "MainStackName"
+                 },
+                 "/",
+                 "Database",
+                 "SubnetZoneAId}}"
+                ]
+               ]
+              }
+             ]
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     ]
+    },
+    "SubnetIds": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/",
+        "Database",
+        "SubnetZoneAId}}"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/",
+        "Database",
+        "SubnetZoneBId}}"
+       ]
+      ]
+     }
+    ]
+   },
+   "Type": "AWS::RDS::DBSubnetGroup"
+  },
+  "ClusterParameterGroup": {
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "AWS::StackName"
+       },
+       " - Cluster Param Group"
+      ]
+     ]
+    },
+    "Family": "aurora-postgresql13",
+    "Parameters": {
+     "rds.logical_replication": 1,
+     "wal_sender_timeout": 240000
+    }
+   },
+   "Type": "AWS::RDS::DBClusterParameterGroup"
+  },
+  "DbClusterSecurityGroup": {
+   "DependsOn": [
+    "DbProxySecurityGroup"
+   ],
+   "Properties": {
+    "GroupDescription": "RDS Security Group",
+    "SecurityGroupEgress": [],
+    "SecurityGroupIngress": [
+     {
+      "Description": "DB Access from In-Region Lambda Functions",
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "SourceSecurityGroupId": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      },
+      "ToPort": 5432
+     },
+     {
+      "Description": "DB Access from In-Region RDS Proxy",
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "SourceSecurityGroupId": {
+       "Ref": "DbProxySecurityGroup"
+      },
+      "ToPort": 5432
+     },
+     {
+      "CidrIp": {
+       "Fn::If": [
+        "IsPrimaryRegion",
+        {
+         "Ref": "FailoverPrivateSubnetZoneACidr"
+        },
+        {
+         "Ref": "PrimaryPrivateSubnetZoneACidr"
+        }
+       ]
+      },
+      "Description": {
+       "Fn::Join": [
+        "",
+        [
+         "DB Access from Lambda Functions in ",
+         {
+          "Fn::If": [
+           "IsPrimaryRegion",
+           {
+            "Ref": "FailoverRegionName"
+           },
+           {
+            "Ref": "PrimaryRegionName"
+           }
+          ]
+         },
+         "a"
+        ]
+       ]
+      },
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "ToPort": 5432
+     },
+     {
+      "CidrIp": {
+       "Fn::If": [
+        "IsPrimaryRegion",
+        {
+         "Ref": "FailoverPrivateSubnetZoneBCidr"
+        },
+        {
+         "Ref": "PrimaryPrivateSubnetZoneBCidr"
+        }
+       ]
+      },
+      "Description": {
+       "Fn::Join": [
+        "",
+        [
+         "DB Access from Lambda Functions in ",
+         {
+          "Fn::If": [
+           "IsPrimaryRegion",
+           {
+            "Ref": "FailoverRegionName"
+           },
+           {
+            "Ref": "PrimaryRegionName"
+           }
+          ]
+         },
+         "b"
+        ]
+       ]
+      },
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "ToPort": 5432
+     }
+    ],
+    "VpcId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/RegionalVpcId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::EC2::SecurityGroup"
+  },
+  "DbProxyRole": {
+   "DependsOn": [
+    "AppDbAdminSecret"
+   ],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "rds.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/AdministratorAccess"
+    ],
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "secretsmanager:GetSecretValue"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Ref": "AppDbAdminSecret"
+          }
+         ]
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "DbProxySecurityGroup": {
+   "Properties": {
+    "GroupDescription": "RDS Proxy Security Group",
+    "SecurityGroupEgress": [],
+    "SecurityGroupIngress": [
+     {
+      "Description": "DB Access from Lambda",
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "SourceSecurityGroupId": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      },
+      "ToPort": 5432
+     },
+     {
+      "CidrIp": {
+       "Fn::If": [
+        "IsPrimaryRegion",
+        {
+         "Ref": "FailoverPrivateSubnetZoneACidr"
+        },
+        {
+         "Ref": "PrimaryPrivateSubnetZoneACidr"
+        }
+       ]
+      },
+      "Description": {
+       "Fn::Join": [
+        "",
+        [
+         "DB Access from Lambda Functions in ",
+         {
+          "Fn::If": [
+           "IsPrimaryRegion",
+           {
+            "Ref": "FailoverRegionName"
+           },
+           {
+            "Ref": "PrimaryRegionName"
+           }
+          ]
+         },
+         "a"
+        ]
+       ]
+      },
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "ToPort": 5432
+     },
+     {
+      "CidrIp": {
+       "Fn::If": [
+        "IsPrimaryRegion",
+        {
+         "Ref": "FailoverPrivateSubnetZoneBCidr"
+        },
+        {
+         "Ref": "PrimaryPrivateSubnetZoneBCidr"
+        }
+       ]
+      },
+      "Description": {
+       "Fn::Join": [
+        "",
+        [
+         "DB Access from Lambda Functions in ",
+         {
+          "Fn::If": [
+           "IsPrimaryRegion",
+           {
+            "Ref": "FailoverRegionName"
+           },
+           {
+            "Ref": "PrimaryRegionName"
+           }
+          ]
+         },
+         "b"
+        ]
+       ]
+      },
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "ToPort": 5432
+     }
+    ],
+    "VpcId": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/RegionalVpcId}}"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::EC2::SecurityGroup"
+  },
+  "DemoDbSubnetGroup": {
+   "Properties": {
+    "DBSubnetGroupDescription": "Demo Database Subnets",
+    "DBSubnetGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "AWS::StackName"
+       },
+       {
+        "Fn::Join": [
+         "",
+         {
+          "Fn::Split": [
+           "subnet-",
+           {
+            "Fn::Join": [
+             "-",
+             [
+              {
+               "Fn::Join": [
+                "",
+                [
+                 "{{resolve:ssm:/",
+                 {
+                  "Ref": "MainStackName"
+                 },
+                 "/",
+                 "Private",
+                 "SubnetZoneAId}}"
+                ]
+               ]
+              },
+              {
+               "Fn::Join": [
+                "",
+                [
+                 "{{resolve:ssm:/",
+                 {
+                  "Ref": "MainStackName"
+                 },
+                 "/",
+                 "Private",
+                 "SubnetZoneAId}}"
+                ]
+               ]
+              }
+             ]
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     ]
+    },
+    "SubnetIds": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/",
+        "Private",
+        "SubnetZoneAId}}"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/",
+        "Private",
+        "SubnetZoneBId}}"
+       ]
+      ]
+     }
+    ]
+   },
+   "Type": "AWS::RDS::DBSubnetGroup"
+  },
+  "FailoverAppCluster": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "AppDbSubnetGroup",
+    "PrimaryRegionDbExportRetriever"
+   ],
+   "Properties": {
+    "BackupRetentionPeriod": 30,
+    "DBSubnetGroupName": {
+     "Ref": "AppDbSubnetGroup"
+    },
+    "DeletionProtection": false,
+    "EnableIAMDatabaseAuthentication": false,
+    "Engine": "aurora-postgresql",
+    "EngineMode": "provisioned",
+    "EngineVersion": "13.7",
+    "GlobalClusterIdentifier": {
+     "Fn::GetAtt": [
+      "PrimaryRegionDbExportRetriever",
+      "GlobalAppDbClusterIdentifier"
+     ]
+    },
+    "KmsKeyId": {
+     "Fn::If": [
+      "IsPrimaryRegion",
+      {
+       "Ref": "PrimaryKmsKeyArn"
+      },
+      {
+       "Ref": "FailoverKmsKeyArn"
+      }
+     ]
+    },
+    "Port": 5432,
+    "RestoreType": "copy-on-write",
+    "StorageEncrypted": true,
+    "VpcSecurityGroupIds": [
+     {
+      "Ref": "DbClusterSecurityGroup"
+     }
+    ]
+   },
+   "Type": "AWS::RDS::DBCluster"
+  },
+  "FailoverAppDbAdminSecretAttachment": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "AppDbAdminSecret",
+    "FailoverAppCluster"
+   ],
+   "Properties": {
+    "SecretId": {
+     "Ref": "AppDbAdminSecret"
+    },
+    "TargetId": {
+     "Ref": "FailoverAppCluster"
+    },
+    "TargetType": "AWS::RDS::DBCluster"
+   },
+   "Type": "AWS::SecretsManager::SecretTargetAttachment"
+  },
+  "FailoverAppInstance1": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "AppDbSubnetGroup",
+    "FailoverAppCluster",
+    "AppDbClusterDeleter"
+   ],
+   "Properties": {
+    "AllowMajorVersionUpgrade": false,
+    "AutoMinorVersionUpgrade": true,
+    "DBClusterIdentifier": {
+     "Ref": "FailoverAppCluster"
+    },
+    "DBInstanceClass": "db.r6g.large",
+    "EnablePerformanceInsights": false,
+    "Engine": "aurora-postgresql",
+    "MultiAZ": false
+   },
+   "Type": "AWS::RDS::DBInstance"
+  },
+  "FailoverAppInstance2": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "AppDbSubnetGroup",
+    "FailoverAppCluster",
+    "AppDbClusterDeleter"
+   ],
+   "Properties": {
+    "AllowMajorVersionUpgrade": false,
+    "AutoMinorVersionUpgrade": true,
+    "DBClusterIdentifier": {
+     "Ref": "FailoverAppCluster"
+    },
+    "DBInstanceClass": "db.r6g.large",
+    "EnablePerformanceInsights": false,
+    "Engine": "aurora-postgresql",
+    "MultiAZ": false
+   },
+   "Type": "AWS::RDS::DBInstance"
+  },
+  "GlobalAppDbClusterIdentifierParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Global App DB Cluster Identifier for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "GlobalAppDbClusterIdentifier"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "PrimaryRegionDbExportRetriever",
+      "GlobalAppDbClusterIdentifier"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "GlobalAppDbReaderDnsEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Global DNS Endpoint for App DB Reader for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "GlobalAppDbReaderDnsEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::Join": [
+      "",
+      [
+       "app",
+       ".db.reader.",
+       {
+        "Ref": "PublicFqdn"
+       },
+       ".internal"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "GlobalAppDbWriterDnsEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Global DNS Endpoint for App DB Writer for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "GlobalAppDbWriterDnsEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::Join": [
+      "",
+      [
+       "app",
+       ".db.writer.",
+       {
+        "Ref": "PublicFqdn"
+       },
+       ".internal"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "GlobalDemoDbReaderDnsEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Global DNS Endpoint for Demo DB Reader for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "GlobalDemoDbReaderDnsEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::Join": [
+      "",
+      [
+       "demo",
+       ".db.reader.",
+       {
+        "Ref": "PublicFqdn"
+       },
+       ".internal"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "GlobalDemoDbWriterDnsEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Global DNS Endpoint for Demo DB Writer for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "GlobalDemoDbWriterDnsEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::Join": [
+      "",
+      [
+       "demo",
+       ".db.writer.",
+       {
+        "Ref": "PublicFqdn"
+       },
+       ".internal"
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "PrimaryRegionDbExportRetriever": {
+   "Properties": {
+    "Properties": {
+     "ExportPrefix": {
+      "Ref": "MainStackName"
+     },
+     "Region": {
+      "Ref": "PrimaryRegionName"
+     },
+     "Version": 1.01
+    },
+    "ServiceToken": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/RegionalCfnExportRetrieverArn}}"
+      ]
+     ]
+    },
+    "Type": "Custom::GetCFNExports",
+    "Version": "1.0"
+   },
+   "Type": "AWS::CloudFormation::CustomResource"
+  },
+  "RdsClusterDeleter": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [
+    "RdsClusterDeleterRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport time\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError as boto3_client_error\n\n'''\n    ClusterArn\n    ClusterIdentifier\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n    response_data = {}\n    \n    if event['RequestType'] in ['Delete']:\n        \n        rds_client = boto3.client('rds')\n        \n        try:\n            \n            '''\n                First, we'll get the cluster's current status\n            '''\n            describe_cluster_resp = rds_client.describe_db_clusters(\n                DBClusterIdentifier = arguments['ClusterArn'],\n            )\n            \n            '''\n                If there's a cluster matching this identifier\n            '''\n            if len(describe_cluster_resp) > 0:\n                \n                cluster_status = describe_cluster_resp['DBClusters'][0]['Status']\n                \n                '''\n                    If the cluster's current status is AVAILABLE\n                '''\n                if cluster_status in ['available']:\n                    \n                    try:\n                        \n                        '''\n                            We'll try to delete it\n                        '''\n                        rds_client.delete_db_cluster(\n                            SkipFinalSnapshot = True,\n                            DBClusterIdentifier = arguments['ClusterIdentifier']\n                        )\n                        \n                        '''\n                            Now, we'll monitor its deletion and respond only after it's successful.\n                        '''\n                        while True:\n                            \n                            try:\n                                \n                                describe_cluster_resp = rds_client.describe_db_clusters(\n                                    DBClusterIdentifier = arguments['ClusterArn'],\n                                )\n\n                                time.sleep(5)\n                                \n                            except boto3_client_error as e:\n                                \n                                if e.response['Error']['Code'] == 'DBClusterNotFoundFault':\n                                    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)\n                                \n                                else:\n                                    print('Failed to Retrieve Cluster: ' + str(e.response))\n                                    return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n                            \n                    except boto3_client_error as e:\n                        print('Failed to Delete Cluster: ' + str(e.response))\n                        return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n                \n        except boto3_client_error as e:\n            print('Failed to Retrieve Cluster: ' + str(e.response))\n            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n\n    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)"
+    },
+    "Description": "Deletes the failover cluster once the local instances are deleted",
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/RegionalLambdaLayerVersionArn}}"
+       ]
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "RdsClusterDeleterRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 300,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "RdsClusterDeleterLogGroup": {
+   "Condition": "IsFailoverRegion",
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "RdsClusterDeleter"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "RdsClusterDeleter"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "RdsClusterDeleterRole": {
+   "Condition": "IsFailoverRegion",
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "rds:DeleteDBCluster",
+          "rds:DescribeDBClusters"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::GetAtt": [
+            "FailoverAppCluster",
+            "DBClusterArn"
+           ]
+          }
+         ],
+         "Sid": "DescribeAndDeleteDBCluster"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "RegionalAppDbAdminSecretArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "App DB Admin Secret ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbAdminSecretArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Ref": "AppDbAdminSecret"
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbClusterArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Regional App DB Cluster ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbClusterArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "FailoverAppCluster",
+      "DBClusterArn"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbClusterIdentifierParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Regional App DB Cluster Identifier for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbClusterIdentifier"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Ref": "FailoverAppCluster"
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbClusterReaderEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "App DB Cluster Reader Endpoint for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbClusterReaderEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "FailoverAppCluster",
+      "ReadEndpoint.Address"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbClusterWriterEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "App DB Cluster Writer Endpoint for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbClusterWriterEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "FailoverAppCluster",
+      "Endpoint.Address"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbProxyArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "RDS Proxy ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbProxyArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "AppDbProxy",
+      "DBProxyArn"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbProxyNameParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "App DB Proxy name for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbProxyName"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Ref": "AppDbProxy"
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbProxyPortParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "RDS Proxy port for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbProxyPort"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "FailoverAppCluster",
+      "Endpoint.Port"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbProxyReaderEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "RDS Proxy reader endpoint for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbProxyReaderEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "AppDbProxyReaderEndpoint",
+      "Endpoint"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalAppDbProxyWriterEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "RDS Proxy writer endpoint for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalAppDbProxyWriterEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "AppDbProxy",
+      "Endpoint"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalDemoDbAdminSecretArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Demo DB Admin Secret ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalDemoDbAdminSecretArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::Join": [
+      ":",
+      [
+       "arn",
+       {
+        "Ref": "AWS::Partition"
+       },
+       "secretsmanager",
+       {
+        "Ref": "AWS::Region"
+       },
+       {
+        "Ref": "AWS::AccountId"
+       },
+       "secret",
+       {
+        "Fn::Select": [
+         6,
+         {
+          "Fn::Split": [
+           ":",
+           {
+            "Fn::GetAtt": [
+             "PrimaryRegionDbExportRetriever",
+             "DemoDbAdminSecretArn"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  }
+ },
+ "Transform": {
+  "Name": "AWS::SecretsManager-2020-07-23"
+ }
+}

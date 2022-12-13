@@ -1,0 +1,641 @@
+{
+ "Conditions": {
+  "IsFailoverRegion": {
+   "Fn::Not": [
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "PrimaryRegionName"
+      },
+      {
+       "Ref": "AWS::Region"
+      }
+     ]
+    }
+   ]
+  },
+  "IsPrimaryRegion": {
+   "Fn::Equals": [
+    {
+     "Ref": "PrimaryRegionName"
+    },
+    {
+     "Ref": "AWS::Region"
+    }
+   ]
+  }
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [],
+   "ParameterLabels": {}
+  },
+  "Comments": "",
+  "CreatedBy": "Carter Meyers (AWS)",
+  "Description": "This application deploys a Global RDS Aurora cluster.",
+  "LastUpdated": "December 13, 2022",
+  "Version": "v1.03"
+ },
+ "Parameters": {
+  "CodeDownloadUrl": {
+   "Default": "https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main",
+   "Description": "The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.",
+   "Type": "String"
+  },
+  "DatabaseAdminPassword": {
+   "Description": "The password to be used for the RDS Aurora admin account.",
+   "NoEcho": true,
+   "Type": "String"
+  },
+  "DatabaseAdminUsername": {
+   "Description": "The username to be used for the RDS Aurora admin account.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneACidr": {
+   "Default": "10.10.10.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "FailoverDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.13.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "FailoverKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneACidr": {
+   "Default": "10.10.9.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "FailoverPrivateSubnetZoneBCidr": {
+   "Default": "10.10.12.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneACidr": {
+   "Default": "10.10.8.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "FailoverPublicSubnetZoneBCidr": {
+   "Default": "10.10.11.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "FailoverRegionName": {
+   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "FailoverVpcCidr": {
+   "Default": "10.10.8.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "MainStackName": {
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneACidr": {
+   "Default": "10.10.2.0/24",
+   "Description": "The CIDR range you wish to use for your primary database subnet.",
+   "Type": "String"
+  },
+  "PrimaryDatabaseSubnetZoneBCidr": {
+   "Default": "10.10.5.0/24",
+   "Description": "The CIDR range you wish to use for your failover database subnet.",
+   "Type": "String"
+  },
+  "PrimaryKmsKeyArn": {
+   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneACidr": {
+   "Default": "10.10.1.0/24",
+   "Description": "The CIDR range you wish to use for your primary private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPrivateSubnetZoneBCidr": {
+   "Default": "10.10.4.0/24",
+   "Description": "The CIDR range you wish to use for your failover private subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneACidr": {
+   "Default": "10.10.0.0/24",
+   "Description": "The CIDR range you wish to use for your primary public subnet.",
+   "Type": "String"
+  },
+  "PrimaryPublicSubnetZoneBCidr": {
+   "Default": "10.10.3.0/24",
+   "Description": "The CIDR range you wish to use for your failover public subnet.",
+   "Type": "String"
+  },
+  "PrimaryRegionName": {
+   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Type": "String"
+  },
+  "PrimaryVpcCidr": {
+   "Default": "10.10.0.0/21",
+   "Description": "The CIDR range you wish to use for your VPC.",
+   "Type": "String"
+  },
+  "PrivateHostedZoneId": {
+   "Type": "String"
+  },
+  "PublicFqdn": {
+   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB.",
+   "Type": "String"
+  },
+  "PublicHostedZoneId": {
+   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Type": "String"
+  }
+ },
+ "Resources": {
+  "Bucket": {
+   "Properties": {
+    "AccessControl": "Private",
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "VersioningConfiguration": {
+     "Status": "Suspended"
+    }
+   },
+   "Type": "AWS::S3::Bucket"
+  },
+  "BucketPolicy": {
+   "DependsOn": [
+    "Bucket",
+    "CloudFrontAccessIdentity"
+   ],
+   "Properties": {
+    "Bucket": {
+     "Ref": "Bucket"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetObject"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":iam::cloudfront:user/CloudFront Origin Access Identity ",
+           {
+            "Ref": "CloudFrontAccessIdentity"
+           }
+          ]
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "Bucket",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::S3::BucketPolicy"
+  },
+  "CloudFrontAccessIdentity": {
+   "Properties": {
+    "CloudFrontOriginAccessIdentityConfig": {
+     "Comment": "Dashboard"
+    }
+   },
+   "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+  },
+  "CloudFrontDistribution": {
+   "DependsOn": [
+    "TlsCertificate",
+    "ResponseHeadersPolicy",
+    "CloudFrontAccessIdentity"
+   ],
+   "Properties": {
+    "DistributionConfig": {
+     "Aliases": [
+      {
+       "Fn::Join": [
+        ".",
+        [
+         "dashboard",
+         {
+          "Ref": "PublicFqdn"
+         }
+        ]
+       ]
+      }
+     ],
+     "Comment": {
+      "Fn::Join": [
+       "",
+       [
+        "Dashboard Controller for ",
+        {
+         "Ref": "MainStackName"
+        }
+       ]
+      ]
+     },
+     "DefaultCacheBehavior": {
+      "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+      "Compress": true,
+      "ForwardedValues": {
+       "QueryString": true
+      },
+      "ResponseHeadersPolicyId": {
+       "Ref": "ResponseHeadersPolicy"
+      },
+      "TargetOriginId": "dashboard-bucket",
+      "ViewerProtocolPolicy": "redirect-to-https"
+     },
+     "Enabled": true,
+     "HttpVersion": "http2",
+     "IPV6Enabled": true,
+     "Origins": [
+      {
+       "DomainName": {
+        "Fn::GetAtt": [
+         "Bucket",
+         "DomainName"
+        ]
+       },
+       "Id": "dashboard-bucket",
+       "S3OriginConfig": {
+        "OriginAccessIdentity": {
+         "Fn::Join": [
+          "",
+          [
+           "origin-access-identity/cloudfront/",
+           {
+            "Ref": "CloudFrontAccessIdentity"
+           }
+          ]
+         ]
+        }
+       }
+      }
+     ],
+     "ViewerCertificate": {
+      "AcmCertificateArn": {
+       "Ref": "TlsCertificate"
+      },
+      "MinimumProtocolVersion": "TLSv1.1_2016",
+      "SslSupportMethod": "sni-only"
+     }
+    }
+   },
+   "Type": "AWS::CloudFront::Distribution"
+  },
+  "DashboardCodeDeployer": {
+   "DependsOn": [
+    "DashboardCodeDeployerRole"
+   ],
+   "Properties": {
+    "Architectures": [
+     "x86_64"
+    ],
+    "Code": {
+     "ZipFile": "import sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\nimport os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\nfrom collections import defaultdict\nfrom botocore.exceptions import ClientError as boto3_client_error\nhttp=urllib3.PoolManager()\ntry:from urllib2 import HTTPError,build_opener,HTTPHandler,Request\nexcept ImportError:from urllib.error import HTTPError;from urllib.request import build_opener,HTTPHandler,Request\n'\\n    - CodeBucketName | str\\n    - CodeDownloadUrl | str\\n'\ndef handler(event,context):\n\tb='VersionId';a='Key';Z='/dashboard/';Y=True;X=False;W='RequestType';P='CodeBucketName';D=context;A=event;print(json.dumps(A));C=A['ResourceProperties']['Properties'];E=boto3.client('s3');F={}\n\tif A[W]in['Create','Update']:\n\t\tG='/tmp/dashboard_code.zip';J=G.replace('.zip','');'\\n            Download the codebase\\n        ';Q=urllib3.PoolManager();K=Q.request('GET',C['CodeDownloadUrl'],preload_content=X)\n\t\tif K.status!=200:return X\n\t\twith K as R,open(G,'wb')as S:shutil.copyfileobj(R,S)\n\t\t'\\n            Unzip the downloaded code\\n        '\n\t\twith zipfile.ZipFile(G,'r')as T:T.extractall(J)\n\t\t'\\n            For each file in the local code directory\\n        '\n\t\tfor B in glob.iglob(J+'**/**',recursive=Y):\n\t\t\t\"\\n                If it's one of the dashboard files and it's a file, not a directory, we'll upload it to S3\\n            \"\n\t\t\tif Z in B and os.path.isfile(B):\n\t\t\t\ttry:U=B.split(Z)[1];E.upload_file(B,C[P],U,ExtraArgs={'ContentType':mimetypes.guess_type(B)[0]})\n\t\t\t\texcept boto3_client_error as H:print('Failed to Upload Dashboard File: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\telif A[W]in['Delete']:\n\t\t\"\\n            Here, we'll delete all objects, versions, and delete markers from the bucket.\\n        \";V=E.get_paginator('list_object_versions');I=[]\n\t\tfor L in V.paginate(Bucket=C[P]):\n\t\t\tfor M in ['Versions','DeleteMarkers']:\n\t\t\t\tif M in L:\n\t\t\t\t\tfor N in L[M]:I.append({a:N[a],b:N[b]})\n\t\tfor O in range(0,len(I),1000):\n\t\t\ttry:c=E.delete_objects(Bucket=C[P],Delete={'Objects':I[O:O+1000],'Quiet':Y})\n\t\t\texcept boto3_client_error as H:print('Failed to Delete S3 Objects: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\treturn cfnresponse.send(A,D,cfnresponse.SUCCESS,F)"
+    },
+    "Description": "Downloads dashboard code from a remote repo and deploys it to Amazon S3",
+    "Environment": {
+     "Variables": {
+      "CODE_BUCKET_NAME": {
+       "Ref": "Bucket"
+      },
+      "CODE_DOWNLOAD_URL": {
+       "Ref": "CodeDownloadUrl"
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "{{resolve:ssm:/",
+        {
+         "Ref": "MainStackName"
+        },
+        "/RegionalLambdaLayerVersionArn}}"
+       ]
+      ]
+     }
+    ],
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "DashboardCodeDeployerRole",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 30,
+    "TracingConfig": {
+     "Mode": "PassThrough"
+    },
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/LambdaSecurityGroupId}}"
+        ]
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneAId}}"
+        ]
+       ]
+      },
+      {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/PrivateSubnetZoneBId}}"
+        ]
+       ]
+      }
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "DashboardCodeDeployerLogGroup": {
+   "DeletionPolicy": "Delete",
+   "DependsOn": [
+    "DashboardCodeDeployer"
+   ],
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "DashboardCodeDeployer"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Type": "AWS::Logs::LogGroup"
+  },
+  "DashboardCodeDeployerResource": {
+   "DependsOn": [
+    "Bucket",
+    "DashboardCodeDeployer",
+    "DashboardCodeDeployerLogGroup"
+   ],
+   "Properties": {
+    "Properties": {
+     "CodeBucketName": {
+      "Ref": "Bucket"
+     },
+     "CodeDownloadUrl": {
+      "Ref": "CodeDownloadUrl"
+     }
+    },
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "DashboardCodeDeployer",
+      "Arn"
+     ]
+    },
+    "Type": "Custom::DeployDashboardCode",
+    "Version": "1.0"
+   },
+   "Type": "AWS::CloudFormation::CustomResource"
+  },
+  "DashboardCodeDeployerRole": {
+   "DependsOn": [],
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sts:AssumeRole"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": [
+         "lambda.amazonaws.com"
+        ]
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+    ],
+    "MaxSessionDuration": 3600,
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": [
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:DeleteObject",
+          "s3:ListBucketVersions",
+          "s3:DeleteObjectVersion"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::GetAtt": [
+            "Bucket",
+            "Arn"
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             {
+              "Fn::GetAtt": [
+               "Bucket",
+               "Arn"
+              ]
+             },
+             "/*"
+            ]
+           ]
+          }
+         ],
+         "Sid": "PutS3Objects"
+        }
+       ]
+      },
+      "PolicyName": "main-policy"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "DnsRecord": {
+   "DependsOn": [
+    "CloudFrontDistribution"
+   ],
+   "Properties": {
+    "HostedZoneId": {
+     "Ref": "PublicHostedZoneId"
+    },
+    "RecordSets": [
+     {
+      "AliasTarget": {
+       "DNSName": {
+        "Fn::GetAtt": [
+         "CloudFrontDistribution",
+         "DomainName"
+        ]
+       },
+       "HostedZoneId": "Z2FDTNDATAQYW2"
+      },
+      "Name": {
+       "Fn::Join": [
+        ".",
+        [
+         "dashboard",
+         {
+          "Ref": "PublicFqdn"
+         }
+        ]
+       ]
+      },
+      "Type": "A"
+     }
+    ]
+   },
+   "Type": "AWS::Route53::RecordSetGroup"
+  },
+  "ResponseHeadersPolicy": {
+   "Properties": {
+    "ResponseHeadersPolicyConfig": {
+     "CorsConfig": {
+      "AccessControlAllowCredentials": false,
+      "AccessControlAllowHeaders": {
+       "Items": [
+        "*"
+       ]
+      },
+      "AccessControlAllowMethods": {
+       "Items": [
+        "GET",
+        "POST",
+        "OPTIONS"
+       ]
+      },
+      "AccessControlAllowOrigins": {
+       "Items": [
+        "*"
+       ]
+      },
+      "AccessControlExposeHeaders": {
+       "Items": [
+        "*"
+       ]
+      },
+      "OriginOverride": false
+     },
+     "Name": {
+      "Fn::Join": [
+       "",
+       [
+        {
+         "Ref": "MainStackName"
+        },
+        "-CORS-With-Preflight"
+       ]
+      ]
+     }
+    }
+   },
+   "Type": "AWS::CloudFront::ResponseHeadersPolicy"
+  },
+  "TlsCertificate": {
+   "Properties": {
+    "DomainName": {
+     "Fn::Join": [
+      ".",
+      [
+       "dashboard",
+       {
+        "Ref": "PublicFqdn"
+       }
+      ]
+     ]
+    },
+    "DomainValidationOptions": [
+     {
+      "DomainName": {
+       "Fn::Join": [
+        ".",
+        [
+         "dashboard",
+         {
+          "Ref": "PublicFqdn"
+         }
+        ]
+       ]
+      },
+      "HostedZoneId": {
+       "Ref": "PublicHostedZoneId"
+      }
+     }
+    ],
+    "ValidationMethod": "DNS"
+   },
+   "Type": "AWS::CertificateManager::Certificate"
+  }
+ }
+}
