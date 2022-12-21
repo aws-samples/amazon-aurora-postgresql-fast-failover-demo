@@ -13,17 +13,15 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 13, 2022
-  Version: v1.03
+  LastUpdated: December 21, 2022
+  Version: v1.04
 Outputs:
-  PeeringConnectionIdExport:
-    Condition: IsPrimaryRegion
-    Export:
-      Name: !Join
-        - ''
-        - - !Ref 'MainStackName'
-          - -PeeringConnectionId
-    Value: !Ref 'PeeringInvitation'
+  ApiId:
+    Condition: ''
+    Value: !Ref 'Api'
+  ApiRootResourceId:
+    Condition: ''
+    Value: !GetAtt 'Api.RootResourceId'
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -75,8 +73,6 @@ Parameters:
     Default: 10.10.8.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
-  FailoverVpcId:
-    Type: String
   MainStackName:
     Type: String
   PrimaryDatabaseSubnetZoneACidr:
@@ -117,106 +113,82 @@ Parameters:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
-  PrimaryVpcId:
-    Type: String
   PrivateHostedZoneId:
     Type: String
   PublicFqdn:
-    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+    Description: >-
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
       An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB.
+      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+      Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
     Type: String
 Resources:
-  PeeringInvitation:
-    Condition: IsPrimaryRegion
+  Api:
     Properties:
-      PeerOwnerId: !Ref 'AWS::AccountId'
-      PeerRegion: !Ref 'FailoverRegionName'
-      PeerVpcId: !Ref 'FailoverVpcId'
-      Tags:
-        - Key: Name
-          Value: !Join
-            - ''
-            - - !Ref 'MainStackName'
-              - '-'
-              - !Ref 'FailoverRegionName'
-      VpcId: !Ref 'PrimaryVpcId'
-    Type: AWS::EC2::VPCPeeringConnection
-  PrimaryRegionPeeringConnectionIdRetriever:
-    Condition: IsFailoverRegion
-    Properties:
-      Properties:
-        ExportPrefix: !Ref 'MainStackName'
-        Region: !Ref 'PrimaryRegionName'
-        Version: 1.05
-      ServiceToken: !Join
+      Description: !Join
         - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /RegionalCfnExportRetrieverArn}}
-      Type: Custom::GetCFNExports
-      Version: '1.0'
-    Type: AWS::CloudFormation::CustomResource
-  ZoneARouteToFailoverRegion:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - PeeringInvitation
-    Properties:
-      DestinationCidrBlock: !Ref 'FailoverVpcCidr'
-      RouteTableId: !Join
+        - - !If
+            - IsPrimaryRegion
+            - Primary
+            - Failover
+          - ' Dashboard API'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Join
         - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /PrivateRouteTableZone
-          - A
-          - Id}}
-      VpcPeeringConnectionId: !Ref 'PeeringInvitation'
-    Type: AWS::EC2::Route
-  ZoneARouteToPrimaryRegion:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - PrimaryRegionPeeringConnectionIdRetriever
+        - - !Ref 'MainStackName'
+    Type: AWS::ApiGateway::RestApi
+  ApiIdParam:
+    Condition: ''
     Properties:
-      DestinationCidrBlock: !Ref 'PrimaryVpcCidr'
-      RouteTableId: !Join
+      Description: !Join
         - ''
-        - - '{{resolve:ssm:/'
+        - - 'API Gateway ID for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
           - !Ref 'MainStackName'
-          - /PrivateRouteTableZone
-          - A
-          - Id}}
-      VpcPeeringConnectionId: !GetAtt 'PrimaryRegionPeeringConnectionIdRetriever.PeeringConnectionId'
-    Type: AWS::EC2::Route
-  ZoneBRouteToFailoverRegion:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - PeeringInvitation
+          - /
+          - ApiId
+      Tier: Standard
+      Type: String
+      Value: !Ref 'Api'
+    Type: AWS::SSM::Parameter
+  ApiRootResourceIdParam:
+    Condition: ''
     Properties:
-      DestinationCidrBlock: !Ref 'FailoverVpcCidr'
-      RouteTableId: !Join
+      Description: !Join
         - ''
-        - - '{{resolve:ssm:/'
+        - - 'API Gateway Root Resource ID for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
           - !Ref 'MainStackName'
-          - /PrivateRouteTableZone
-          - B
-          - Id}}
-      VpcPeeringConnectionId: !Ref 'PeeringInvitation'
-    Type: AWS::EC2::Route
-  ZoneBRouteToPrimaryRegion:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - PrimaryRegionPeeringConnectionIdRetriever
+          - /
+          - ApiRootResourceId
+      Tier: Standard
+      Type: String
+      Value: !GetAtt 'Api.RootResourceId'
+    Type: AWS::SSM::Parameter
+  DEFAULT4XXGatewayResponse:
     Properties:
-      DestinationCidrBlock: !Ref 'PrimaryVpcCidr'
-      RouteTableId: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /PrivateRouteTableZone
-          - B
-          - Id}}
-      VpcPeeringConnectionId: !GetAtt 'PrimaryRegionPeeringConnectionIdRetriever.PeeringConnectionId'
-    Type: AWS::EC2::Route
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+      ResponseType: DEFAULT_4XX
+      RestApiId: !Ref 'Api'
+    Type: AWS::ApiGateway::GatewayResponse
+  DEFAULT5XXGatewayResponse:
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+      ResponseType: DEFAULT_5XX
+      RestApiId: !Ref 'Api'
+    Type: AWS::ApiGateway::GatewayResponse

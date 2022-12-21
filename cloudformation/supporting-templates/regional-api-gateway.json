@@ -33,27 +33,23 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "December 13, 2022",
-  "Version": "v1.03"
+  "LastUpdated": "December 21, 2022",
+  "Version": "v1.04"
  },
  "Outputs": {
-  "PeeringConnectionIdExport": {
-   "Condition": "IsPrimaryRegion",
-   "Export": {
-    "Name": {
-     "Fn::Join": [
-      "",
-      [
-       {
-        "Ref": "MainStackName"
-       },
-       "-PeeringConnectionId"
-      ]
-     ]
-    }
-   },
+  "ApiId": {
+   "Condition": "",
    "Value": {
-    "Ref": "PeeringInvitation"
+    "Ref": "Api"
+   }
+  },
+  "ApiRootResourceId": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "Api",
+     "RootResourceId"
+    ]
    }
   }
  },
@@ -115,9 +111,6 @@
    "Description": "The CIDR range you wish to use for your VPC.",
    "Type": "String"
   },
-  "FailoverVpcId": {
-   "Type": "String"
-  },
   "MainStackName": {
    "Type": "String"
   },
@@ -164,14 +157,11 @@
    "Description": "The CIDR range you wish to use for your VPC.",
    "Type": "String"
   },
-  "PrimaryVpcId": {
-   "Type": "String"
-  },
   "PrivateHostedZoneId": {
    "Type": "String"
   },
   "PublicFqdn": {
-   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB.",
+   "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS record currently defined in the corresponding Route 53 Hosted Zone.",
    "Type": "String"
   },
   "PublicHostedZoneId": {
@@ -180,193 +170,139 @@
   }
  },
  "Resources": {
-  "PeeringInvitation": {
-   "Condition": "IsPrimaryRegion",
+  "Api": {
    "Properties": {
-    "PeerOwnerId": {
-     "Ref": "AWS::AccountId"
-    },
-    "PeerRegion": {
-     "Ref": "FailoverRegionName"
-    },
-    "PeerVpcId": {
-     "Ref": "FailoverVpcId"
-    },
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": {
-       "Fn::Join": [
-        "",
-        [
-         {
-          "Ref": "MainStackName"
-         },
-         "-",
-         {
-          "Ref": "FailoverRegionName"
-         }
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Fn::If": [
+         "IsPrimaryRegion",
+         "Primary",
+         "Failover"
         ]
-       ]
-      }
-     }
-    ],
-    "VpcId": {
-     "Ref": "PrimaryVpcId"
+       },
+       " Dashboard API"
+      ]
+     ]
+    },
+    "EndpointConfiguration": {
+     "Types": [
+      "REGIONAL"
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "MainStackName"
+       }
+      ]
+     ]
     }
    },
-   "Type": "AWS::EC2::VPCPeeringConnection"
+   "Type": "AWS::ApiGateway::RestApi"
   },
-  "PrimaryRegionPeeringConnectionIdRetriever": {
-   "Condition": "IsFailoverRegion",
+  "ApiIdParam": {
+   "Condition": "",
    "Properties": {
-    "Properties": {
-     "ExportPrefix": {
-      "Ref": "MainStackName"
-     },
-     "Region": {
-      "Ref": "PrimaryRegionName"
-     },
-     "Version": 1.05
-    },
-    "ServiceToken": {
+    "Description": {
      "Fn::Join": [
       "",
       [
-       "{{resolve:ssm:/",
+       "API Gateway ID for ",
        {
-        "Ref": "MainStackName"
+        "Ref": "AWS::StackName"
        },
-       "/RegionalCfnExportRetrieverArn}}"
+       " stack"
       ]
      ]
     },
-    "Type": "Custom::GetCFNExports",
-    "Version": "1.0"
-   },
-   "Type": "AWS::CloudFormation::CustomResource"
-  },
-  "ZoneARouteToFailoverRegion": {
-   "Condition": "IsPrimaryRegion",
-   "DependsOn": [
-    "PeeringInvitation"
-   ],
-   "Properties": {
-    "DestinationCidrBlock": {
-     "Ref": "FailoverVpcCidr"
-    },
-    "RouteTableId": {
+    "Name": {
      "Fn::Join": [
       "",
       [
-       "{{resolve:ssm:/",
+       "/",
        {
         "Ref": "MainStackName"
        },
-       "/PrivateRouteTableZone",
-       "A",
-       "Id}}"
+       "/",
+       "ApiId"
       ]
      ]
     },
-    "VpcPeeringConnectionId": {
-     "Ref": "PeeringInvitation"
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Ref": "Api"
     }
    },
-   "Type": "AWS::EC2::Route"
+   "Type": "AWS::SSM::Parameter"
   },
-  "ZoneARouteToPrimaryRegion": {
-   "Condition": "IsFailoverRegion",
-   "DependsOn": [
-    "PrimaryRegionPeeringConnectionIdRetriever"
-   ],
+  "ApiRootResourceIdParam": {
+   "Condition": "",
    "Properties": {
-    "DestinationCidrBlock": {
-     "Ref": "PrimaryVpcCidr"
-    },
-    "RouteTableId": {
+    "Description": {
      "Fn::Join": [
       "",
       [
-       "{{resolve:ssm:/",
+       "API Gateway Root Resource ID for ",
        {
-        "Ref": "MainStackName"
+        "Ref": "AWS::StackName"
        },
-       "/PrivateRouteTableZone",
-       "A",
-       "Id}}"
+       " stack"
       ]
      ]
     },
-    "VpcPeeringConnectionId": {
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "ApiRootResourceId"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
      "Fn::GetAtt": [
-      "PrimaryRegionPeeringConnectionIdRetriever",
-      "PeeringConnectionId"
+      "Api",
+      "RootResourceId"
      ]
     }
    },
-   "Type": "AWS::EC2::Route"
+   "Type": "AWS::SSM::Parameter"
   },
-  "ZoneBRouteToFailoverRegion": {
-   "Condition": "IsPrimaryRegion",
-   "DependsOn": [
-    "PeeringInvitation"
-   ],
+  "DEFAULT4XXGatewayResponse": {
    "Properties": {
-    "DestinationCidrBlock": {
-     "Ref": "FailoverVpcCidr"
+    "ResponseParameters": {
+     "gatewayresponse.header.Access-Control-Allow-Origin": "'*'"
     },
-    "RouteTableId": {
-     "Fn::Join": [
-      "",
-      [
-       "{{resolve:ssm:/",
-       {
-        "Ref": "MainStackName"
-       },
-       "/PrivateRouteTableZone",
-       "B",
-       "Id}}"
-      ]
-     ]
-    },
-    "VpcPeeringConnectionId": {
-     "Ref": "PeeringInvitation"
+    "ResponseType": "DEFAULT_4XX",
+    "RestApiId": {
+     "Ref": "Api"
     }
    },
-   "Type": "AWS::EC2::Route"
+   "Type": "AWS::ApiGateway::GatewayResponse"
   },
-  "ZoneBRouteToPrimaryRegion": {
-   "Condition": "IsFailoverRegion",
-   "DependsOn": [
-    "PrimaryRegionPeeringConnectionIdRetriever"
-   ],
+  "DEFAULT5XXGatewayResponse": {
    "Properties": {
-    "DestinationCidrBlock": {
-     "Ref": "PrimaryVpcCidr"
+    "ResponseParameters": {
+     "gatewayresponse.header.Access-Control-Allow-Origin": "'*'"
     },
-    "RouteTableId": {
-     "Fn::Join": [
-      "",
-      [
-       "{{resolve:ssm:/",
-       {
-        "Ref": "MainStackName"
-       },
-       "/PrivateRouteTableZone",
-       "B",
-       "Id}}"
-      ]
-     ]
-    },
-    "VpcPeeringConnectionId": {
-     "Fn::GetAtt": [
-      "PrimaryRegionPeeringConnectionIdRetriever",
-      "PeeringConnectionId"
-     ]
+    "ResponseType": "DEFAULT_5XX",
+    "RestApiId": {
+     "Ref": "Api"
     }
    },
-   "Type": "AWS::EC2::Route"
+   "Type": "AWS::ApiGateway::GatewayResponse"
   }
  }
 }

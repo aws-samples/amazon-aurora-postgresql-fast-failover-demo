@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 13, 2022
-  Version: v1.03
+  LastUpdated: December 21, 2022
+  Version: v1.04
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -109,41 +109,58 @@ Parameters:
   PrivateHostedZoneId:
     Type: String
   PublicFqdn:
-    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+    Description: >-
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
       An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB.
+      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+      Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
     Type: String
 Resources:
-  GetClusterInfo:
+  BypassRdsProxy:
     DependsOn:
-      - GetClusterInfoRole
+      - BypassRdsProxyRole
     Properties:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import os\nimport json\nimport boto3\n\ndef handler(event, context):\n\
-          \    \n    print(json.dumps(event))\n    \n    data = {}\n    rds_client\
-          \ = boto3.client('rds')\n\n    cluster_resp = rds_client.describe_db_clusters(\n\
-          \        DBClusterIdentifier = os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n\
-          \    )\n        \n    for member in cluster_resp['DBClusters'][0]['DBClusterMembers']:\n\
-          \        \n        instance_resp = rds_client.describe_db_instances(\n \
-          \           DBInstanceIdentifier = member['DBInstanceIdentifier']\n    \
-          \    )\n        \n        data[member['DBInstanceIdentifier']] = {\n   \
-          \         'az': instance_resp['DBInstances'][0]['AvailabilityZone'],\n \
-          \           'type': 'WRITER' if member['IsClusterWriter'] is True else 'READER'\n\
-          \        }\n        \n    return {\n        'code': 200,\n        'body':\
-          \ json.dumps(data)\n    }"
-      Description: Retrieves DB cluster info
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
+          import boto3\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\
+          \ndef handler(event, context):\n    \n    print(json.dumps(event))\n   \
+          \ \n    '''\n        For each global database endpoint, we'll update it\
+          \ to point to the\n        regional writer endpoint.\n    '''\n    for endpoint_type\
+          \ in ['READER', 'WRITER']:\n        \n        custom_functions.update_dns_record(\n\
+          \            fqdn            = os.environ['GLOBAL_APP_DB_' + endpoint_type\
+          \ + '_ENDPOINT'],\n            new_value       = os.environ['REGIONAL_APP_DB_CLUSTER_'\
+          \ + endpoint_type + '_ENDPOINT'],\n            hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],\n\
+          \        )\n        \n    return {\n        'code': 200,\n        'records':\
+          \ json.dumps([])\n    }"
+      Description: Updates the global database endpoints to bypass the RDS proxy
       Environment:
         Variables:
-          REGIONAL_APP_DB_CLUSTER_IDENTIFIER: !Join
+          GLOBAL_APP_DB_READER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /RegionalAppDbClusterIdentifier}}
+              - /GlobalAppDbReaderDnsEndpoint}}
+          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /GlobalAppDbWriterDnsEndpoint}}
+          PRIVATE_HOSTED_ZONE_ID: !Ref 'PrivateHostedZoneId'
+          REGIONAL_APP_DB_CLUSTER_READER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalAppDbClusterReaderEndpoint}}
+          REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalAppDbClusterWriterEndpoint}}
       Handler: index.handler
       Layers:
         - !Join
@@ -152,7 +169,7 @@ Resources:
             - !Ref 'MainStackName'
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
-      Role: !GetAtt 'GetClusterInfoRole.Arn'
+      Role: !GetAtt 'BypassRdsProxyRole.Arn'
       Runtime: python3.9
       Timeout: 60
       TracingConfig:
@@ -176,18 +193,18 @@ Resources:
               - !Ref 'MainStackName'
               - /PrivateSubnetZoneBId}}
     Type: AWS::Lambda::Function
-  GetClusterInfoLogGroup:
+  BypassRdsProxyLogGroup:
     DeletionPolicy: Delete
     DependsOn:
-      - GetClusterInfo
+      - BypassRdsProxy
     Properties:
       LogGroupName: !Join
         - ''
         - - /aws/lambda/
-          - !Ref 'GetClusterInfo'
+          - !Ref 'BypassRdsProxy'
       RetentionInDays: 30
     Type: AWS::Logs::LogGroup
-  GetClusterInfoMethod:
+  BypassRdsProxyMethod:
     Condition: ''
     Properties:
       ApiKeyRequired: false
@@ -255,7 +272,7 @@ Resources:
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - :lambda:path/2015-03-31/functions/
-            - !GetAtt 'GetClusterInfo.Arn'
+            - !GetAtt 'BypassRdsProxy.Arn'
             - /invocations
       MethodResponses:
         - ResponseModels:
@@ -298,21 +315,21 @@ Resources:
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '500'
-      OperationName: getClusterInfo
-      ResourceId: !Ref 'GetClusterInfoResource'
+      OperationName: getBypassRdsProxy
+      ResourceId: !Ref 'BypassRdsProxyResource'
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Method
-  GetClusterInfoMethodInvocationPermission:
+  BypassRdsProxyMethodInvocationPermission:
     Condition: ''
     DependsOn:
-      - GetClusterInfo
+      - BypassRdsProxy
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !GetAtt 'GetClusterInfo.Arn'
+      FunctionName: !GetAtt 'BypassRdsProxy.Arn'
       Principal: apigateway.amazonaws.com
       SourceArn: !Join
         - ''
@@ -329,9 +346,9 @@ Resources:
           - /*/
           - GET
           - /
-          - get-cluster-info
+          - bypass-rds-proxy
     Type: AWS::Lambda::Permission
-  GetClusterInfoResource:
+  BypassRdsProxyResource:
     Condition: ''
     DependsOn: []
     Properties:
@@ -340,14 +357,14 @@ Resources:
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiRootResourceId}}
-      PathPart: get-cluster-info
+      PathPart: bypass-rds-proxy
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Resource
-  GetClusterInfoResourceOptionsMethod:
+  BypassRdsProxyResourceOptionsMethod:
     Condition: ''
     Properties:
       ApiKeyRequired: false
@@ -374,14 +391,14 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '200'
-      ResourceId: !Ref 'GetClusterInfoResource'
+      ResourceId: !Ref 'BypassRdsProxyResource'
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Method
-  GetClusterInfoRole:
+  BypassRdsProxyRole:
     DependsOn: []
     Properties:
       AssumeRolePolicyDocument:
@@ -400,59 +417,70 @@ Resources:
         - PolicyDocument:
             Statement:
               - Action:
-                  - rds:DescribeDBClusters
+                  - secretsmanager:GetSecretValue
                 Effect: Allow
                 Resource:
                   - !Join
                     - ''
                     - - '{{resolve:ssm:/'
                       - !Ref 'MainStackName'
-                      - /RegionalAppDbClusterArn}}
-                Sid: DescribeRDSClusters
-          PolicyName: get-db-clusters
+                      - /RegionalAppDbAdminSecretArn}}
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RegionalDemoDbAdminSecretArn}}
+                Sid: GetRDSAdminSecret
+              - Action:
+                  - kms:Decrypt
+                Effect: Allow
+                Resource:
+                  - !If
+                    - IsPrimaryRegion
+                    - !Ref 'PrimaryKmsKeyArn'
+                    - !Ref 'FailoverKmsKeyArn'
+                Sid: DecryptWithKMS
+          PolicyName: database-secret-retrieval
         - PolicyDocument:
             Statement:
               - Action:
-                  - rds:DescribeDBInstances
+                  - route53:ChangeResourceRecordSets
                 Effect: Allow
                 Resource:
                   - !Join
                     - ''
-                    - - 'arn:aws:rds:'
-                      - !Ref 'AWS::Region'
-                      - ':'
-                      - !Ref 'AWS::AccountId'
-                      - :db*
-                Sid: DescribeDBInstances
-          PolicyName: get-db-instances
+                    - - arn:aws:route53:::hostedzone/
+                      - !Ref 'PrivateHostedZoneId'
+                Sid: UpdateRoute53Records
+          PolicyName: update-route53-records
     Type: AWS::IAM::Role
-  GetFailoverEvents:
+  CalculateRecoveryTime:
     DependsOn:
-      - GetFailoverEventsRole
+      - CalculateRecoveryTimeRole
     Properties:
       Architectures:
         - x86_64
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
           import psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\
-          \        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n\
-          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
-          \    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
+          \ndef handler(event, context):\n    \n    print(json.dumps(event))\n   \
+          \ \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
+          \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
           \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
           \        password = demo_db_credentials['password'],\n        database =\
           \ demo_db_credentials['database'],\n        connect_timeout = 3,\n     \
           \   sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n\
-          \    \n    curs.execute('''\n        SELECT \n            event,\n     \
-          \       to_char(insertedon,'HH24:MI:SS') AS time, \n            insertedon\
-          \ \n        FROM failoverevents\n        ORDER BY insertedon\n    ''');\n\
-          \    \n    failover_events = curs.fetchall()\n    \n    curs.close()\n \
-          \   db_conn.close()\n    \n    records_to_return = []\n    \n    for x in\
-          \ failover_events:\n    \n        c = 0\n        temp2 = {}\n        \n\
+          \    \n    curs.execute('''\n        SELECT\n            DATE_PART('second',\
+          \ max(insertedon)::time - min(insertedon)::time) AS rto\n        FROM dataclient\
+          \ \n        WHERE http_code = 500 \n        GROUP BY http_code\n    ''');\n\
+          \    \n    client_events = curs.fetchall()\n    \n    curs.close()\n   \
+          \ db_conn.close()\n    \n    records_to_return = []\n    \n    for client_event\
+          \ in client_events:\n    \n        c = 0\n        temp2 = {}\n        \n\
           \        for col in curs.description:\n            \n            temp2.update({str(col[0]):\
-          \ x[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n\
+          \ client_event[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n\
           \    \n    return {\n        'code': 200,\n        'body': json.dumps(records_to_return,\
-          \ default = str)\n    }"
-      Description: Retrieves failover events from the database
+          \ default = str),\n    }"
+      Description: Retrieves the resolved RTO
       Environment:
         Variables:
           GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
@@ -473,7 +501,7 @@ Resources:
             - !Ref 'MainStackName'
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
-      Role: !GetAtt 'GetFailoverEventsRole.Arn'
+      Role: !GetAtt 'CalculateRecoveryTimeRole.Arn'
       Runtime: python3.9
       Timeout: 60
       TracingConfig:
@@ -497,18 +525,18 @@ Resources:
               - !Ref 'MainStackName'
               - /PrivateSubnetZoneBId}}
     Type: AWS::Lambda::Function
-  GetFailoverEventsLogGroup:
+  CalculateRecoveryTimeLogGroup:
     DeletionPolicy: Delete
     DependsOn:
-      - GetFailoverEvents
+      - CalculateRecoveryTime
     Properties:
       LogGroupName: !Join
         - ''
         - - /aws/lambda/
-          - !Ref 'GetFailoverEvents'
+          - !Ref 'CalculateRecoveryTime'
       RetentionInDays: 30
     Type: AWS::Logs::LogGroup
-  GetFailoverEventsMethod:
+  CalculateRecoveryTimeMethod:
     Condition: ''
     Properties:
       ApiKeyRequired: false
@@ -576,7 +604,7 @@ Resources:
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - :lambda:path/2015-03-31/functions/
-            - !GetAtt 'GetFailoverEvents.Arn'
+            - !GetAtt 'CalculateRecoveryTime.Arn'
             - /invocations
       MethodResponses:
         - ResponseModels:
@@ -619,21 +647,21 @@ Resources:
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '500'
-      OperationName: getFailoverEvents
-      ResourceId: !Ref 'GetFailoverEventsResource'
+      OperationName: getRecoveryTime
+      ResourceId: !Ref 'CalculateRecoveryTimeResource'
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Method
-  GetFailoverEventsMethodInvocationPermission:
+  CalculateRecoveryTimeMethodInvocationPermission:
     Condition: ''
     DependsOn:
-      - GetFailoverEvents
+      - CalculateRecoveryTime
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !GetAtt 'GetFailoverEvents.Arn'
+      FunctionName: !GetAtt 'CalculateRecoveryTime.Arn'
       Principal: apigateway.amazonaws.com
       SourceArn: !Join
         - ''
@@ -650,9 +678,9 @@ Resources:
           - /*/
           - GET
           - /
-          - get-failover-events
+          - calculate-recovery-time
     Type: AWS::Lambda::Permission
-  GetFailoverEventsResource:
+  CalculateRecoveryTimeResource:
     Condition: ''
     DependsOn: []
     Properties:
@@ -661,14 +689,14 @@ Resources:
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiRootResourceId}}
-      PathPart: get-failover-events
+      PathPart: calculate-recovery-time
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Resource
-  GetFailoverEventsResourceOptionsMethod:
+  CalculateRecoveryTimeResourceOptionsMethod:
     Condition: ''
     Properties:
       ApiKeyRequired: false
@@ -695,14 +723,14 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '200'
-      ResourceId: !Ref 'GetFailoverEventsResource'
+      ResourceId: !Ref 'CalculateRecoveryTimeResource'
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Method
-  GetFailoverEventsRole:
+  CalculateRecoveryTimeRole:
     DependsOn: []
     Properties:
       AssumeRolePolicyDocument:
@@ -746,10 +774,9 @@ Resources:
                 Sid: DecryptWithKMS
           PolicyName: database-secret-retrieval
     Type: AWS::IAM::Role
-  UpdateDatabaseNacl:
-    Condition: IsPrimaryRegion
+  InitiateFailover:
     DependsOn:
-      - UpdateDatabaseNaclRole
+      - InitiateFailoverRole
     Properties:
       Architectures:
         - x86_64
@@ -757,9 +784,13 @@ Resources:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
           import boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport\
           \ multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\
-          \ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n\
-          \    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
-          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
+          \ncustom_functions = multi_region_db.Functions()\n\ndef trigger_failover():\n\
+          \    \n    try:\n        \n        boto3.client('rds').failover_db_cluster(\n\
+          \            DBClusterIdentifier = os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n\
+          \        )\n        \n    except boto3_client_error as e:\n        raise\
+          \ Exception('Failed to Initiate Cluster Failover: ' + str(e))\n        \n\
+          def log_failover_event():\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
+          \    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
           \    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
           \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
           \        sslmode = 'require',\n        password = demo_db_credentials['password'],\n\
@@ -767,15 +798,11 @@ Resources:
           \ = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT\
           \ INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz\
           \ = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n\
-          \    \n    curs.close()\n    db_conn.close()\n    \n    try:\n        \n\
-          \        boto3.client('ec2').replace_network_acl_entry(\n            Egress\
-          \ = False, \n            CidrBlock = '0.0.0.0/0',\n            NetworkAclId\
-          \ = os.environ['REGIONAL_APP_DB_NACL_ID'],\n            Protocol = '-1',\n\
-          \            RuleAction = 'deny',\n            RuleNumber = 100\n      \
-          \  )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed\
-          \ to Update Database NACL')\n    \n    return {\n        'code': 200,\n\
-          \        'body': json.dumps([])\n    }"
-      Description: Updates the database NACL to deny incoming traffic
+          \    \n    curs.close()\n    db_conn.close()\n    \ndef handler(event, context):\n\
+          \    \n    print(json.dumps(event))\n    \n    trigger_failover()\n\n  \
+          \  log_failover_event()\n    \n    return {\n        'code': 200,\n    \
+          \    'body': []\n    }"
+      Description: Logs failover events
       Environment:
         Variables:
           GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
@@ -783,11 +810,11 @@ Resources:
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /GlobalDemoDbWriterDnsEndpoint}}
-          REGIONAL_APP_DB_NACL_ID: !Join
+          REGIONAL_APP_DB_CLUSTER_IDENTIFIER: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /RegionalAppDatabaseNaclId}}
+              - /RegionalAppDbClusterIdentifier}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -801,7 +828,7 @@ Resources:
             - !Ref 'MainStackName'
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
-      Role: !GetAtt 'UpdateDatabaseNaclRole.Arn'
+      Role: !GetAtt 'InitiateFailoverRole.Arn'
       Runtime: python3.9
       Timeout: 60
       TracingConfig:
@@ -825,20 +852,19 @@ Resources:
               - !Ref 'MainStackName'
               - /PrivateSubnetZoneBId}}
     Type: AWS::Lambda::Function
-  UpdateDatabaseNaclLogGroup:
-    Condition: IsPrimaryRegion
+  InitiateFailoverLogGroup:
     DeletionPolicy: Delete
     DependsOn:
-      - UpdateDatabaseNacl
+      - InitiateFailover
     Properties:
       LogGroupName: !Join
         - ''
         - - /aws/lambda/
-          - !Ref 'UpdateDatabaseNacl'
+          - !Ref 'InitiateFailover'
       RetentionInDays: 30
     Type: AWS::Logs::LogGroup
-  UpdateDatabaseNaclMethod:
-    Condition: IsPrimaryRegion
+  InitiateFailoverMethod:
+    Condition: ''
     Properties:
       ApiKeyRequired: false
       AuthorizationType: NONE
@@ -905,7 +931,7 @@ Resources:
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - :lambda:path/2015-03-31/functions/
-            - !GetAtt 'UpdateDatabaseNacl.Arn'
+            - !GetAtt 'InitiateFailover.Arn'
             - /invocations
       MethodResponses:
         - ResponseModels:
@@ -948,21 +974,21 @@ Resources:
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '500'
-      OperationName: getFailoverEvents
-      ResourceId: !Ref 'UpdateDatabaseNaclResource'
+      OperationName: getInitiateFailover
+      ResourceId: !Ref 'InitiateFailoverResource'
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Method
-  UpdateDatabaseNaclMethodInvocationPermission:
-    Condition: IsPrimaryRegion
+  InitiateFailoverMethodInvocationPermission:
+    Condition: ''
     DependsOn:
-      - UpdateDatabaseNacl
+      - InitiateFailover
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !GetAtt 'UpdateDatabaseNacl.Arn'
+      FunctionName: !GetAtt 'InitiateFailover.Arn'
       Principal: apigateway.amazonaws.com
       SourceArn: !Join
         - ''
@@ -979,10 +1005,10 @@ Resources:
           - /*/
           - GET
           - /
-          - update-database-nacl
+          - initiate-failover
     Type: AWS::Lambda::Permission
-  UpdateDatabaseNaclResource:
-    Condition: IsPrimaryRegion
+  InitiateFailoverResource:
+    Condition: ''
     DependsOn: []
     Properties:
       ParentId: !Join
@@ -990,15 +1016,15 @@ Resources:
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiRootResourceId}}
-      PathPart: update-database-nacl
+      PathPart: initiate-failover
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Resource
-  UpdateDatabaseNaclResourceOptionsMethod:
-    Condition: IsPrimaryRegion
+  InitiateFailoverResourceOptionsMethod:
+    Condition: ''
     Properties:
       ApiKeyRequired: false
       AuthorizationType: NONE
@@ -1024,14 +1050,14 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '200'
-      ResourceId: !Ref 'UpdateDatabaseNaclResource'
+      ResourceId: !Ref 'InitiateFailoverResource'
       RestApiId: !Join
         - ''
         - - '{{resolve:ssm:/'
           - !Ref 'MainStackName'
           - /ApiId}}
     Type: AWS::ApiGateway::Method
-  UpdateDatabaseNaclRole:
+  InitiateFailoverRole:
     DependsOn: []
     Properties:
       AssumeRolePolicyDocument:
@@ -1074,32 +1100,17 @@ Resources:
                     - !Ref 'FailoverKmsKeyArn'
                 Sid: DecryptWithKMS
           PolicyName: database-secret-retrieval
-    Type: AWS::IAM::Role
-  UpdateDatabaseNaclRoleCustomPolicy:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - UpdateDatabaseNaclRole
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - ec2:ReplaceNetworkAclEntry
-            Effect: Allow
-            Resource:
-              - !Join
-                - ''
-                - - 'arn:aws:ec2:'
-                  - !Ref 'AWS::Region'
-                  - ':'
-                  - !Ref 'AWS::AccountId'
-                  - :network-acl/
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - rds:FailoverDBCluster
+                Effect: Allow
+                Resource:
                   - !Join
                     - ''
                     - - '{{resolve:ssm:/'
                       - !Ref 'MainStackName'
-                      - /RegionalAppDatabaseNaclId}}
-            Sid: UpdateACLEntry
-      PolicyName: custom-policy
-      Roles:
-        - !Ref 'UpdateDatabaseNaclRole'
-    Type: AWS::IAM::Policy
+                      - /RegionalAppDbClusterArn}}
+                Sid: InitiateClusterFailover
+          PolicyName: initiate-cluster-failover
+    Type: AWS::IAM::Role

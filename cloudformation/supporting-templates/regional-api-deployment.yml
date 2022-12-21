@@ -13,15 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 13, 2022
-  Version: v1.03
-Outputs:
-  ApiId:
-    Condition: ''
-    Value: !Ref 'Api'
-  ApiRootResourceId:
-    Condition: ''
-    Value: !GetAtt 'Api.RootResourceId'
+  LastUpdated: December 21, 2022
+  Version: v1.04
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -116,77 +109,108 @@ Parameters:
   PrivateHostedZoneId:
     Type: String
   PublicFqdn:
-    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+    Description: >-
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
       An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB.
+      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+      Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
     Type: String
 Resources:
-  Api:
+  BasePathMapping:
+    DependsOn:
+      - DomainName
+      - Deployment
+      - DeploymentStage
     Properties:
-      Description: !Join
+      DomainName: !Join
         - ''
-        - - !If
-            - IsPrimaryRegion
-            - Primary
-            - Failover
-          - ' Dashboard API'
+        - - api.
+          - !Ref 'PublicFqdn'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiId}}
+      Stage: v1
+    Type: AWS::ApiGateway::BasePathMapping
+  Deployment:
+    Properties:
+      Description: Initial Deployment
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiId}}
+    Type: AWS::ApiGateway::Deployment
+  DeploymentStage:
+    DependsOn:
+      - Deployment
+    Properties:
+      DeploymentId: !Ref 'Deployment'
+      MethodSettings:
+        - CachingEnabled: false
+          DataTraceEnabled: true
+          HttpMethod: GET
+          MetricsEnabled: true
+          ResourcePath: /~1
+          ThrottlingBurstLimit: '5000'
+          ThrottlingRateLimit: '10000'
+        - CachingEnabled: false
+          DataTraceEnabled: true
+          HttpMethod: POST
+          MetricsEnabled: true
+          ResourcePath: /~1
+          ThrottlingBurstLimit: '5000'
+          ThrottlingRateLimit: '10000'
+      RestApiId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /ApiId}}
+      StageName: v1
+    Type: AWS::ApiGateway::Stage
+  DnsRecord:
+    DependsOn:
+      - DomainName
+    Properties:
+      HostedZoneId: !Ref 'PublicHostedZoneId'
+      RecordSets:
+        - AliasTarget:
+            DNSName: !GetAtt 'DomainName.RegionalDomainName'
+            HostedZoneId: !GetAtt 'DomainName.RegionalHostedZoneId'
+          Name: !Join
+            - ''
+            - - api.
+              - !Ref 'PublicFqdn'
+          Type: A
+    Type: AWS::Route53::RecordSetGroup
+  DomainName:
+    DependsOn:
+      - TlsCertificate
+    Properties:
+      DomainName: !Join
+        - ''
+        - - api.
+          - !Ref 'PublicFqdn'
       EndpointConfiguration:
         Types:
           - REGIONAL
-      Name: !Join
-        - ''
-        - - !Ref 'MainStackName'
-    Type: AWS::ApiGateway::RestApi
-  ApiIdParam:
-    Condition: ''
+      RegionalCertificateArn: !Ref 'TlsCertificate'
+    Type: AWS::ApiGateway::DomainName
+  TlsCertificate:
     Properties:
-      Description: !Join
+      DomainName: !Join
         - ''
-        - - 'API Gateway ID for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - ApiId
-      Tier: Standard
-      Type: String
-      Value: !Ref 'Api'
-    Type: AWS::SSM::Parameter
-  ApiRootResourceIdParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'API Gateway Root Resource ID for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - ApiRootResourceId
-      Tier: Standard
-      Type: String
-      Value: !GetAtt 'Api.RootResourceId'
-    Type: AWS::SSM::Parameter
-  DEFAULT4XXGatewayResponse:
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
-      ResponseType: DEFAULT_4XX
-      RestApiId: !Ref 'Api'
-    Type: AWS::ApiGateway::GatewayResponse
-  DEFAULT5XXGatewayResponse:
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
-      ResponseType: DEFAULT_5XX
-      RestApiId: !Ref 'Api'
-    Type: AWS::ApiGateway::GatewayResponse
+        - - api.
+          - !Ref 'PublicFqdn'
+      DomainValidationOptions:
+        - DomainName: !Join
+            - ''
+            - - api.
+              - !Ref 'PublicFqdn'
+          HostedZoneId: !Ref 'PublicHostedZoneId'
+      ValidationMethod: DNS
+    Type: AWS::CertificateManager::Certificate

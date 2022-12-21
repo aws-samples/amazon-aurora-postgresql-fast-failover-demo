@@ -89,8 +89,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 13, 2022
-  Version: v1.03
+  LastUpdated: December 21, 2022
+  Version: v1.04
 Outputs:
   CrossRegionFailoverDemoUrl:
     Value: !Join
@@ -218,9 +218,11 @@ Parameters:
     Description: The CIDR range you wish to use for your VPC.
     Type: String
   PublicFqdn:
-    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+    Description: >-
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
       An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB.
+      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+      Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -329,8 +331,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -425,9 +427,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -468,7 +472,6 @@ Resources:
                 - CachingEnabled: false
                   DataTraceEnabled: true
                   HttpMethod: GET
-                  LoggingLevel: INFO
                   MetricsEnabled: true
                   ResourcePath: /~1
                   ThrottlingBurstLimit: '5000'
@@ -476,7 +479,6 @@ Resources:
                 - CachingEnabled: false
                   DataTraceEnabled: true
                   HttpMethod: POST
-                  LoggingLevel: INFO
                   MetricsEnabled: true
                   ResourcePath: /~1
                   ThrottlingBurstLimit: '5000'
@@ -629,8 +631,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           ApiId:
             Condition: ''
@@ -732,9 +734,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -906,8 +910,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -1002,9 +1006,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -2096,8 +2102,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -2192,9 +2198,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -3295,8 +3303,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -3391,9 +3399,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -4615,8 +4625,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -4711,9 +4721,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -5349,8 +5361,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           RegionalCfnExportRetrieverArn:
             Condition: ''
@@ -5458,9 +5470,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -5939,8 +5953,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -6035,9 +6049,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -6407,8 +6423,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           GlobalAppDbClusterIdentifier:
             Condition: ''
@@ -6599,9 +6615,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -7533,8 +7551,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -7629,9 +7647,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -8837,8 +8857,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           DatabaseSubnetZoneAId:
             Condition: ''
@@ -8970,9 +8990,11 @@ Resources:
             Description: The CIDR range you wish to use for your VPC.
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -9651,8 +9673,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           GlobalAppDbClusterIdentifier:
             Condition: ''
@@ -9851,9 +9873,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -11247,8 +11271,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           PeeringConnectionIdExport:
             Condition: IsPrimaryRegion
@@ -11356,9 +11380,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -11555,8 +11581,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 13, 2022
-          Version: v1.03
+          LastUpdated: December 21, 2022
+          Version: v1.04
         Outputs:
           WebLoadBalancerFqdn:
             Condition: ''
@@ -11658,9 +11684,11 @@ Resources:
           PrivateHostedZoneId:
             Type: String
           PublicFqdn:
-            Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+            Description: >-
+              The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
               An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-              ALB.
+              ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+              Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
             Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.

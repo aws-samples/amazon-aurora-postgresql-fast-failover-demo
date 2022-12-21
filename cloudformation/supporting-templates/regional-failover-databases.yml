@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 13, 2022
-  Version: v1.03
+  LastUpdated: December 21, 2022
+  Version: v1.04
 Outputs:
   GlobalAppDbClusterIdentifier:
     Condition: ''
@@ -23,7 +23,7 @@ Outputs:
         - '-'
         - - !Ref 'MainStackName'
           - GlobalAppDbClusterIdentifier
-    Value: !Ref 'GlobalAppCluster'
+    Value: !GetAtt 'PrimaryRegionDbExportRetriever.GlobalAppDbClusterIdentifier'
   GlobalAppDbReaderDnsEndpoint:
     Condition: ''
     Value: !Join
@@ -40,14 +40,6 @@ Outputs:
         - .db.writer.
         - !Ref 'PublicFqdn'
         - .internal
-  GlobalDemoDbClusterIdentifier:
-    Condition: ''
-    Export:
-      Name: !Join
-        - '-'
-        - - !Ref 'MainStackName'
-          - GlobalDemoDbClusterIdentifier
-    Value: !Ref 'GlobalDemoCluster'
   GlobalDemoDbReaderDnsEndpoint:
     Condition: ''
     Value: !Join
@@ -74,16 +66,16 @@ Outputs:
     Value: !Ref 'AppDbAdminSecret'
   RegionalAppDbClusterArn:
     Condition: ''
-    Value: !GetAtt 'PrimaryAppCluster.DBClusterArn'
+    Value: !GetAtt 'FailoverAppCluster.DBClusterArn'
   RegionalAppDbClusterIdentifier:
     Condition: ''
-    Value: !Ref 'PrimaryAppCluster'
+    Value: !Ref 'FailoverAppCluster'
   RegionalAppDbClusterReaderEndpoint:
     Condition: ''
-    Value: !GetAtt 'PrimaryAppCluster.ReadEndpoint.Address'
+    Value: !GetAtt 'FailoverAppCluster.ReadEndpoint.Address'
   RegionalAppDbClusterWriterEndpoint:
     Condition: ''
-    Value: !GetAtt 'PrimaryAppCluster.Endpoint.Address'
+    Value: !GetAtt 'FailoverAppCluster.Endpoint.Address'
   RegionalAppDbProxyArn:
     Condition: ''
     Value: !GetAtt 'AppDbProxy.DBProxyArn'
@@ -92,7 +84,7 @@ Outputs:
     Value: !Ref 'AppDbProxy'
   RegionalAppDbProxyPort:
     Condition: ''
-    Value: !GetAtt 'PrimaryAppCluster.Endpoint.Port'
+    Value: !GetAtt 'FailoverAppCluster.Endpoint.Port'
   RegionalAppDbProxyReaderEndpoint:
     Condition: ''
     Value: !GetAtt 'AppDbProxyReaderEndpoint.Endpoint'
@@ -106,19 +98,19 @@ Outputs:
         - '-'
         - - !Ref 'MainStackName'
           - DemoDbAdminSecretArn
-    Value: !Ref 'DemoDbAdminSecret'
-  RegionalDemoDbClusterArn:
-    Condition: ''
-    Value: !GetAtt 'PrimaryDemoCluster.DBClusterArn'
-  RegionalDemoDbClusterIdentifier:
-    Condition: ''
-    Value: !Ref 'PrimaryDemoCluster'
-  RegionalDemoDbClusterReaderEndpoint:
-    Condition: ''
-    Value: !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
-  RegionalDemoDbClusterWriterEndpoint:
-    Condition: ''
-    Value: !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
+    Value: !Join
+      - ':'
+      - - arn
+        - !Ref 'AWS::Partition'
+        - secretsmanager
+        - !Ref 'AWS::Region'
+        - !Ref 'AWS::AccountId'
+        - secret
+        - !Select
+          - 6
+          - !Split
+            - ':'
+            - !GetAtt 'PrimaryRegionDbExportRetriever.DemoDbAdminSecretArn'
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -213,42 +205,21 @@ Parameters:
   PrivateHostedZoneId:
     Type: String
   PublicFqdn:
-    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+    Description: >-
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
       An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB.
+      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+      Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
     Type: String
 Resources:
-  AppDatabasePreparerResource:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - DatabasePreparerLogGroup
-      - AppDbAdminSecret
-      - PrimaryAppInstance1
-      - PrimaryAppInstance2
-    Properties:
-      Properties:
-        DatabaseIdentifier: App
-        QueriesToExecute:
-          - "\n                    CREATE SEQUENCE IF NOT EXISTS data_sequence start\
-            \ 1 increment 1;\n                    "
-          - "\n                    CREATE TABLE IF NOT EXISTS dataserver (\n     \
-            \                   id integer not null primary key default nextval('data_sequence'),\n\
-            \                        guid VARCHAR(255) NOT NULL,\n               \
-            \         insertedon timestamp NOT NULL DEFAULT NOW(),\n             \
-            \           migratedon timestamp NOT NULL DEFAULT NOW()\n            \
-            \        );\n                    "
-      ServiceToken: !GetAtt 'DatabasePreparer.Arn'
-      Type: Custom::ExecuteQueriesAgainstDatabase
-      Version: '1.0'
-    Type: AWS::CloudFormation::CustomResource
   AppDbAdminSecret:
     Properties:
       Description: !Join
         - ''
-        - - 'Primary App DB Cluster Admin Account for '
+        - - 'Failover App DB Cluster Admin Account for '
           - !Ref 'MainStackName'
       KmsKeyId: !If
         - IsPrimaryRegion
@@ -262,110 +233,25 @@ Resources:
           - !Ref 'DatabaseAdminPassword'
           - '", "database": "template1"}'
     Type: AWS::SecretsManager::Secret
-  AppDbDnsDeleter:
-    Condition: IsPrimaryRegion
+  AppDbClusterDeleter:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - AppDbSubnetGroup
+      - FailoverAppCluster
+      - RdsClusterDeleterLogGroup
     Properties:
       Properties:
-        Fqdns:
-          - !Join
-            - .
-            - - app
-              - db
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          - !Join
-            - .
-            - - app
-              - db
-              - cluster
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          - !Join
-            - .
-            - - app
-              - db
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          - !Join
-            - .
-            - - app
-              - db
-              - cluster
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-        HostedZoneId: !Ref 'PrivateHostedZoneId'
-      ServiceToken: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /RegionalDnsRecordDeleterArn}}
-      Type: Custom::DeployLambdaLayer
+        ClusterArn: !GetAtt 'FailoverAppCluster.DBClusterArn'
+        ClusterIdentifier: !Ref 'FailoverAppCluster'
+      ServiceToken: !GetAtt 'RdsClusterDeleter.Arn'
+      Type: Custom::DeleteRdsCluster
       Version: '1.0'
     Type: AWS::CloudFormation::CustomResource
-  AppDbDnsRecords:
-    Condition: IsPrimaryRegion
-    DeletionPolicy: Retain
-    DependsOn:
-      - AppDbProxy
-    Properties:
-      HostedZoneId: !Ref 'PrivateHostedZoneId'
-      RecordSets:
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - cluster
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryAppCluster.ReadEndpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'AppDbProxyReaderEndpoint.Endpoint'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - cluster
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryAppCluster.Endpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'AppDbProxy.Endpoint'
-          TTL: '1'
-          Type: CNAME
-    Type: AWS::Route53::RecordSetGroup
   AppDbProxy:
     Properties:
       Auth:
         - SecretArn: !Ref 'AppDbAdminSecret'
-      DBProxyName: !Ref 'PrimaryAppCluster'
+      DBProxyName: !Ref 'FailoverAppCluster'
       EngineFamily: POSTGRESQL
       RequireTLS: true
       RoleArn: !GetAtt 'DbProxyRole.Arn'
@@ -412,10 +298,10 @@ Resources:
     Condition: IsPrimaryRegion
     DependsOn:
       - AppDbProxy
-      - PrimaryAppInstance1
+      - FailoverAppInstance1
     Properties:
       DBClusterIdentifiers:
-        - !Ref 'PrimaryAppCluster'
+        - !Ref 'FailoverAppCluster'
       DBProxyName: !Ref 'AppDbProxy'
       TargetGroupName: default
     Type: AWS::RDS::DBProxyTargetGroup
@@ -472,125 +358,6 @@ Resources:
         rds.logical_replication: 1
         wal_sender_timeout: 240000
     Type: AWS::RDS::DBClusterParameterGroup
-  DatabasePreparer:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - DatabasePreparerRole
-    Properties:
-      Architectures:
-        - x86_64
-      Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\nimport subprocess\n\nimport\
-          \ os\nimport json\nimport boto3\nimport psycopg2\nimport cfnresponse\nimport\
-          \ multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\
-          \ncustom_functions = multi_region_db.Functions()\n\n'''\n    RDSAdminSecretArn\n\
-          '''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n\
-          \    \n    if 'Properties' in event['ResourceProperties']:\n        arguments\
-          \ = event['ResourceProperties']['Properties']\n        \n    operation =\
-          \ event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n  \
-          \  response_data = {}\n    \n    if event['RequestType'] in ['Create', 'Update']:\n\
-          \        \n        db_credentials = custom_functions.get_db_credentials(arguments['DatabaseIdentifier'])\n\
-          \        \n        try:\n                \n            db_conn = psycopg2.connect(\n\
-          \                host = db_credentials['host'],\n                port =\
-          \ db_credentials['port'],\n                user = db_credentials['username'],\n\
-          \                password = db_credentials['password'],\n              \
-          \  database = db_credentials['database'],\n                connect_timeout\
-          \ = 3,\n                sslmode = 'require',\n            )\n          \
-          \  \n            curs = db_conn.cursor()\n            \n            for\
-          \ query in arguments['QueriesToExecute']:\n                \n          \
-          \      curs.execute(query.replace('\\r','').replace('\\n',' '))\n      \
-          \          db_conn.commit()\n            \n            curs.close()\n  \
-          \          db_conn.close()\n        \n        except Exception as error:\n\
-          \n            print('There was a problem executing the DDL statements: '\
-          \ + str(error))\n            return cfnresponse.send(event, context, cfnresponse.FAILED,\
-          \ response_data)\n            \n    return cfnresponse.send(event, context,\
-          \ cfnresponse.SUCCESS, response_data)"
-      Description: Executes DDL statements against new DB clusters to create necessary
-        schema
-      Environment:
-        Variables:
-          REGIONAL_APP_DB_SECRET_ARN: !Ref 'AppDbAdminSecret'
-          REGIONAL_DEMO_DB_SECRET_ARN: !Ref 'DemoDbAdminSecret'
-      Handler: index.handler
-      Layers:
-        - !Join
-          - ''
-          - - '{{resolve:ssm:/'
-            - !Ref 'MainStackName'
-            - /RegionalLambdaLayerVersionArn}}
-      MemorySize: 128
-      Role: !GetAtt 'DatabasePreparerRole.Arn'
-      Runtime: python3.9
-      Timeout: 60
-      TracingConfig:
-        Mode: PassThrough
-      VpcConfig:
-        SecurityGroupIds:
-          - !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /LambdaSecurityGroupId}}
-        SubnetIds:
-          - !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /PrivateSubnetZoneAId}}
-          - !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /PrivateSubnetZoneBId}}
-    Type: AWS::Lambda::Function
-  DatabasePreparerLogGroup:
-    Condition: IsPrimaryRegion
-    DeletionPolicy: Delete
-    DependsOn:
-      - DatabasePreparer
-    Properties:
-      LogGroupName: !Join
-        - ''
-        - - /aws/lambda/
-          - !Ref 'DatabasePreparer'
-      RetentionInDays: 30
-    Type: AWS::Logs::LogGroup
-  DatabasePreparerRole:
-    DependsOn: []
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-      MaxSessionDuration: 3600
-      Policies:
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - secretsmanager:GetSecretValue
-                Effect: Allow
-                Resource:
-                  - !Ref 'AppDbAdminSecret'
-                  - !Ref 'DemoDbAdminSecret'
-                Sid: GetRDSAdminSecret
-              - Action:
-                  - kms:Decrypt
-                Effect: Allow
-                Resource:
-                  - !If
-                    - IsPrimaryRegion
-                    - !Ref 'PrimaryKmsKeyArn'
-                    - !Ref 'FailoverKmsKeyArn'
-                Sid: DecryptWithKMS
-          PolicyName: database-secret-retrieval
-    Type: AWS::IAM::Role
   DbClusterSecurityGroup:
     DependsOn:
       - DbProxySecurityGroup
@@ -722,150 +489,6 @@ Resources:
           - !Ref 'MainStackName'
           - /RegionalVpcId}}
     Type: AWS::EC2::SecurityGroup
-  DemoDatabasePreparerResource:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - DatabasePreparerLogGroup
-      - DemoDbAdminSecret
-      - PrimaryDemoInstance1
-      - PrimaryDemoInstance2
-    Properties:
-      Properties:
-        DatabaseIdentifier: Demo
-        QueriesToExecute:
-          - "\n                    CREATE TABLE IF NOT EXISTS dataclient (\n     \
-            \                   guid character varying(255) COLLATE pg_catalog.\"\
-            default\" NOT NULL,\n                        primary_region integer NOT\
-            \ NULL,\n                        failover_region integer NOT NULL,\n \
-            \                       http_code integer,\n                        insertedon\
-            \ time without time zone\n                    );\n                    "
-          - "\n                    CREATE TABLE IF NOT EXISTS failoverevents (\n \
-            \                       event integer NOT NULL,\n                    \
-            \    insertedon timestamp without time zone NOT NULL\n               \
-            \     );\n                    "
-      ServiceToken: !GetAtt 'DatabasePreparer.Arn'
-      Type: Custom::ExecuteQueriesAgainstDatabase
-      Version: '1.0'
-    Type: AWS::CloudFormation::CustomResource
-  DemoDbAdminSecret:
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Primary Demo DB Cluster Admin Account for '
-          - !Ref 'MainStackName'
-      KmsKeyId: !If
-        - IsPrimaryRegion
-        - !Ref 'PrimaryKmsKeyArn'
-        - !Ref 'FailoverKmsKeyArn'
-      ReplicaRegions:
-        - KmsKeyId: !Ref 'FailoverKmsKeyArn'
-          Region: !Ref 'FailoverRegionName'
-      SecretString: !Join
-        - ''
-        - - '{"username": "'
-          - !Ref 'DatabaseAdminUsername'
-          - '", "password": "'
-          - !Ref 'DatabaseAdminPassword'
-          - '", "database": "template1"}'
-    Type: AWS::SecretsManager::Secret
-  DemoDbDnsDeleter:
-    Condition: IsPrimaryRegion
-    Properties:
-      Properties:
-        Fqdns:
-          - !Join
-            - .
-            - - demo
-              - db
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          - !Join
-            - .
-            - - demo
-              - db
-              - cluster
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          - !Join
-            - .
-            - - demo
-              - db
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          - !Join
-            - .
-            - - demo
-              - db
-              - cluster
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-        HostedZoneId: !Ref 'PrivateHostedZoneId'
-      ServiceToken: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /RegionalDnsRecordDeleterArn}}
-      Type: Custom::DeployLambdaLayer
-      Version: '1.0'
-    Type: AWS::CloudFormation::CustomResource
-  DemoDbDnsRecords:
-    Condition: IsPrimaryRegion
-    DeletionPolicy: Retain
-    DependsOn: []
-    Properties:
-      HostedZoneId: !Ref 'PrivateHostedZoneId'
-      RecordSets:
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - cluster
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - cluster
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
-          TTL: '1'
-          Type: CNAME
-    Type: AWS::Route53::RecordSetGroup
   DemoDbSubnetGroup:
     Properties:
       DBSubnetGroupDescription: Demo Database Subnets
@@ -908,15 +531,70 @@ Resources:
             - Private
             - SubnetZoneBId}}
     Type: AWS::RDS::DBSubnetGroup
-  GlobalAppCluster:
-    Condition: IsPrimaryRegion
+  FailoverAppCluster:
+    Condition: IsFailoverRegion
     DependsOn:
       - AppDbSubnetGroup
-      - PrimaryAppCluster
+      - PrimaryRegionDbExportRetriever
     Properties:
+      BackupRetentionPeriod: 30
+      DBSubnetGroupName: !Ref 'AppDbSubnetGroup'
       DeletionProtection: false
-      SourceDBClusterIdentifier: !Ref 'PrimaryAppCluster'
-    Type: AWS::RDS::GlobalCluster
+      EnableIAMDatabaseAuthentication: false
+      Engine: aurora-postgresql
+      EngineMode: provisioned
+      EngineVersion: '13.7'
+      GlobalClusterIdentifier: !GetAtt 'PrimaryRegionDbExportRetriever.GlobalAppDbClusterIdentifier'
+      KmsKeyId: !If
+        - IsPrimaryRegion
+        - !Ref 'PrimaryKmsKeyArn'
+        - !Ref 'FailoverKmsKeyArn'
+      Port: 5432
+      RestoreType: copy-on-write
+      StorageEncrypted: true
+      VpcSecurityGroupIds:
+        - !Ref 'DbClusterSecurityGroup'
+    Type: AWS::RDS::DBCluster
+  FailoverAppDbAdminSecretAttachment:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - AppDbAdminSecret
+      - FailoverAppCluster
+    Properties:
+      SecretId: !Ref 'AppDbAdminSecret'
+      TargetId: !Ref 'FailoverAppCluster'
+      TargetType: AWS::RDS::DBCluster
+    Type: AWS::SecretsManager::SecretTargetAttachment
+  FailoverAppInstance1:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - AppDbSubnetGroup
+      - FailoverAppCluster
+      - AppDbClusterDeleter
+    Properties:
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      DBClusterIdentifier: !Ref 'FailoverAppCluster'
+      DBInstanceClass: db.r6g.large
+      EnablePerformanceInsights: false
+      Engine: aurora-postgresql
+      MultiAZ: false
+    Type: AWS::RDS::DBInstance
+  FailoverAppInstance2:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - AppDbSubnetGroup
+      - FailoverAppCluster
+      - AppDbClusterDeleter
+    Properties:
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      DBClusterIdentifier: !Ref 'FailoverAppCluster'
+      DBInstanceClass: db.r6g.large
+      EnablePerformanceInsights: false
+      Engine: aurora-postgresql
+      MultiAZ: false
+    Type: AWS::RDS::DBInstance
   GlobalAppDbClusterIdentifierParam:
     Condition: ''
     Properties:
@@ -933,7 +611,7 @@ Resources:
           - GlobalAppDbClusterIdentifier
       Tier: Standard
       Type: String
-      Value: !Ref 'GlobalAppCluster'
+      Value: !GetAtt 'PrimaryRegionDbExportRetriever.GlobalAppDbClusterIdentifier'
     Type: AWS::SSM::Parameter
   GlobalAppDbReaderDnsEndpointParam:
     Condition: ''
@@ -981,33 +659,6 @@ Resources:
           - !Ref 'PublicFqdn'
           - .internal
     Type: AWS::SSM::Parameter
-  GlobalDemoCluster:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - DemoDbSubnetGroup
-      - PrimaryDemoCluster
-    Properties:
-      DeletionProtection: false
-      SourceDBClusterIdentifier: !Ref 'PrimaryDemoCluster'
-    Type: AWS::RDS::GlobalCluster
-  GlobalDemoDbClusterIdentifierParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Global Demo DB Cluster Identifier for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - GlobalDemoDbClusterIdentifier
-      Tier: Standard
-      Type: String
-      Value: !Ref 'GlobalDemoCluster'
-    Type: AWS::SSM::Parameter
   GlobalDemoDbReaderDnsEndpointParam:
     Condition: ''
     Properties:
@@ -1054,122 +705,128 @@ Resources:
           - !Ref 'PublicFqdn'
           - .internal
     Type: AWS::SSM::Parameter
-  PrimaryAppCluster:
-    Condition: IsPrimaryRegion
+  PrimaryRegionDbExportRetriever:
+    Properties:
+      Properties:
+        ExportPrefix: !Ref 'MainStackName'
+        Region: !Ref 'PrimaryRegionName'
+        Version: 1.01
+      ServiceToken: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /RegionalCfnExportRetrieverArn}}
+      Type: Custom::GetCFNExports
+      Version: '1.0'
+    Type: AWS::CloudFormation::CustomResource
+  RdsClusterDeleter:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - RdsClusterDeleterRole
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
+          import time\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions\
+          \ import ClientError as boto3_client_error\n\n'''\n    ClusterArn\n    ClusterIdentifier\n\
+          '''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n\
+          \    \n    arguments = event['ResourceProperties']['Properties']\n    operation\
+          \ = event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n\
+          \    response_data = {}\n    \n    if event['RequestType'] in ['Delete']:\n\
+          \        \n        rds_client = boto3.client('rds')\n        \n        try:\n\
+          \            \n            '''\n                First, we'll get the cluster's\
+          \ current status\n            '''\n            describe_cluster_resp = rds_client.describe_db_clusters(\n\
+          \                DBClusterIdentifier = arguments['ClusterArn'],\n      \
+          \      )\n            \n            '''\n                If there's a cluster\
+          \ matching this identifier\n            '''\n            if len(describe_cluster_resp)\
+          \ > 0:\n                \n                cluster_status = describe_cluster_resp['DBClusters'][0]['Status']\n\
+          \                \n                '''\n                    If the cluster's\
+          \ current status is AVAILABLE\n                '''\n                if cluster_status\
+          \ in ['available']:\n                    \n                    try:\n  \
+          \                      \n                        '''\n                 \
+          \           We'll try to delete it\n                        '''\n      \
+          \                  rds_client.delete_db_cluster(\n                     \
+          \       SkipFinalSnapshot = True,\n                            DBClusterIdentifier\
+          \ = arguments['ClusterIdentifier']\n                        )\n        \
+          \                \n                        '''\n                       \
+          \     Now, we'll monitor its deletion and respond only after it's successful.\n\
+          \                        '''\n                        while True:\n    \
+          \                        \n                            try:\n          \
+          \                      \n                                describe_cluster_resp\
+          \ = rds_client.describe_db_clusters(\n                                 \
+          \   DBClusterIdentifier = arguments['ClusterArn'],\n                   \
+          \             )\n\n                                time.sleep(5)\n     \
+          \                           \n                            except boto3_client_error\
+          \ as e:\n                                \n                            \
+          \    if e.response['Error']['Code'] == 'DBClusterNotFoundFault':\n     \
+          \                               return cfnresponse.send(event, context,\
+          \ cfnresponse.SUCCESS, response_data)\n                                \n\
+          \                                else:\n                               \
+          \     print('Failed to Retrieve Cluster: ' + str(e.response))\n        \
+          \                            return cfnresponse.send(event, context, cfnresponse.FAILED,\
+          \ response_data)\n                            \n                    except\
+          \ boto3_client_error as e:\n                        print('Failed to Delete\
+          \ Cluster: ' + str(e.response))\n                        return cfnresponse.send(event,\
+          \ context, cfnresponse.FAILED, response_data)\n                \n      \
+          \  except boto3_client_error as e:\n            print('Failed to Retrieve\
+          \ Cluster: ' + str(e.response))\n            return cfnresponse.send(event,\
+          \ context, cfnresponse.FAILED, response_data)\n\n    return cfnresponse.send(event,\
+          \ context, cfnresponse.SUCCESS, response_data)"
+      Description: Deletes the failover cluster once the local instances are deleted
+      Handler: index.handler
+      Layers:
+        - !Join
+          - ''
+          - - '{{resolve:ssm:/'
+            - !Ref 'MainStackName'
+            - /RegionalLambdaLayerVersionArn}}
+      MemorySize: 128
+      Role: !GetAtt 'RdsClusterDeleterRole.Arn'
+      Runtime: python3.9
+      Timeout: 300
+      TracingConfig:
+        Mode: PassThrough
+    Type: AWS::Lambda::Function
+  RdsClusterDeleterLogGroup:
+    Condition: IsFailoverRegion
     DeletionPolicy: Delete
     DependsOn:
-      - AppDbSubnetGroup
+      - RdsClusterDeleter
     Properties:
-      BackupRetentionPeriod: 30
-      DBSubnetGroupName: !Ref 'AppDbSubnetGroup'
-      DeletionProtection: false
-      EnableIAMDatabaseAuthentication: false
-      Engine: aurora-postgresql
-      EngineMode: provisioned
-      EngineVersion: '13.7'
-      KmsKeyId: !If
-        - IsPrimaryRegion
-        - !Ref 'PrimaryKmsKeyArn'
-        - !Ref 'FailoverKmsKeyArn'
-      MasterUserPassword: !Ref 'DatabaseAdminPassword'
-      MasterUsername: !Ref 'DatabaseAdminUsername'
-      Port: 5432
-      StorageEncrypted: true
-      VpcSecurityGroupIds:
-        - !Ref 'DbClusterSecurityGroup'
-    Type: AWS::RDS::DBCluster
-  PrimaryAppDbAdminSecretAttachment:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - AppDbAdminSecret
-      - PrimaryAppCluster
-    Properties:
-      SecretId: !Ref 'AppDbAdminSecret'
-      TargetId: !Ref 'PrimaryAppCluster'
-      TargetType: AWS::RDS::DBCluster
-    Type: AWS::SecretsManager::SecretTargetAttachment
-  PrimaryAppInstance1:
-    Condition: IsPrimaryRegion
+      LogGroupName: !Join
+        - ''
+        - - /aws/lambda/
+          - !Ref 'RdsClusterDeleter'
+      RetentionInDays: 30
+    Type: AWS::Logs::LogGroup
+  RdsClusterDeleterRole:
+    Condition: IsFailoverRegion
     DependsOn: []
     Properties:
-      AllowMajorVersionUpgrade: false
-      AutoMinorVersionUpgrade: true
-      DBClusterIdentifier: !Ref 'PrimaryAppCluster'
-      DBInstanceClass: db.r6g.large
-      EnablePerformanceInsights: false
-      Engine: aurora-postgresql
-      MultiAZ: false
-    Type: AWS::RDS::DBInstance
-  PrimaryAppInstance2:
-    Condition: IsPrimaryRegion
-    DependsOn: []
-    Properties:
-      AllowMajorVersionUpgrade: false
-      AutoMinorVersionUpgrade: true
-      DBClusterIdentifier: !Ref 'PrimaryAppCluster'
-      DBInstanceClass: db.r6g.large
-      EnablePerformanceInsights: false
-      Engine: aurora-postgresql
-      MultiAZ: false
-    Type: AWS::RDS::DBInstance
-  PrimaryDemoCluster:
-    Condition: IsPrimaryRegion
-    DeletionPolicy: Delete
-    DependsOn:
-      - DemoDbSubnetGroup
-    Properties:
-      BackupRetentionPeriod: 30
-      DBSubnetGroupName: !Ref 'DemoDbSubnetGroup'
-      DeletionProtection: false
-      EnableIAMDatabaseAuthentication: false
-      Engine: aurora-postgresql
-      EngineMode: provisioned
-      EngineVersion: '13.7'
-      KmsKeyId: !If
-        - IsPrimaryRegion
-        - !Ref 'PrimaryKmsKeyArn'
-        - !Ref 'FailoverKmsKeyArn'
-      MasterUserPassword: !Ref 'DatabaseAdminPassword'
-      MasterUsername: !Ref 'DatabaseAdminUsername'
-      Port: 5432
-      StorageEncrypted: true
-      VpcSecurityGroupIds:
-        - !Ref 'DbClusterSecurityGroup'
-    Type: AWS::RDS::DBCluster
-  PrimaryDemoDbAdminSecretAttachment:
-    Condition: IsPrimaryRegion
-    DependsOn:
-      - DemoDbAdminSecret
-      - PrimaryDemoCluster
-    Properties:
-      SecretId: !Ref 'DemoDbAdminSecret'
-      TargetId: !Ref 'PrimaryDemoCluster'
-      TargetType: AWS::RDS::DBCluster
-    Type: AWS::SecretsManager::SecretTargetAttachment
-  PrimaryDemoInstance1:
-    Condition: IsPrimaryRegion
-    DependsOn: []
-    Properties:
-      AllowMajorVersionUpgrade: false
-      AutoMinorVersionUpgrade: true
-      DBClusterIdentifier: !Ref 'PrimaryDemoCluster'
-      DBInstanceClass: db.r6g.large
-      EnablePerformanceInsights: false
-      Engine: aurora-postgresql
-      MultiAZ: false
-    Type: AWS::RDS::DBInstance
-  PrimaryDemoInstance2:
-    Condition: IsPrimaryRegion
-    DependsOn: []
-    Properties:
-      AllowMajorVersionUpgrade: false
-      AutoMinorVersionUpgrade: true
-      DBClusterIdentifier: !Ref 'PrimaryDemoCluster'
-      DBInstanceClass: db.r6g.large
-      EnablePerformanceInsights: false
-      Engine: aurora-postgresql
-      MultiAZ: false
-    Type: AWS::RDS::DBInstance
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - rds:DeleteDBCluster
+                  - rds:DescribeDBClusters
+                Effect: Allow
+                Resource:
+                  - !GetAtt 'FailoverAppCluster.DBClusterArn'
+                Sid: DescribeAndDeleteDBCluster
+          PolicyName: main-policy
+    Type: AWS::IAM::Role
   RegionalAppDbAdminSecretArnParam:
     Condition: ''
     Properties:
@@ -1204,7 +861,7 @@ Resources:
           - RegionalAppDbClusterArn
       Tier: Standard
       Type: String
-      Value: !GetAtt 'PrimaryAppCluster.DBClusterArn'
+      Value: !GetAtt 'FailoverAppCluster.DBClusterArn'
     Type: AWS::SSM::Parameter
   RegionalAppDbClusterIdentifierParam:
     Condition: ''
@@ -1222,7 +879,7 @@ Resources:
           - RegionalAppDbClusterIdentifier
       Tier: Standard
       Type: String
-      Value: !Ref 'PrimaryAppCluster'
+      Value: !Ref 'FailoverAppCluster'
     Type: AWS::SSM::Parameter
   RegionalAppDbClusterReaderEndpointParam:
     Condition: ''
@@ -1240,7 +897,7 @@ Resources:
           - RegionalAppDbClusterReaderEndpoint
       Tier: Standard
       Type: String
-      Value: !GetAtt 'PrimaryAppCluster.ReadEndpoint.Address'
+      Value: !GetAtt 'FailoverAppCluster.ReadEndpoint.Address'
     Type: AWS::SSM::Parameter
   RegionalAppDbClusterWriterEndpointParam:
     Condition: ''
@@ -1258,7 +915,7 @@ Resources:
           - RegionalAppDbClusterWriterEndpoint
       Tier: Standard
       Type: String
-      Value: !GetAtt 'PrimaryAppCluster.Endpoint.Address'
+      Value: !GetAtt 'FailoverAppCluster.Endpoint.Address'
     Type: AWS::SSM::Parameter
   RegionalAppDbProxyArnParam:
     Condition: ''
@@ -1312,7 +969,7 @@ Resources:
           - RegionalAppDbProxyPort
       Tier: Standard
       Type: String
-      Value: !GetAtt 'PrimaryAppCluster.Endpoint.Port'
+      Value: !GetAtt 'FailoverAppCluster.Endpoint.Port'
     Type: AWS::SSM::Parameter
   RegionalAppDbProxyReaderEndpointParam:
     Condition: ''
@@ -1366,79 +1023,19 @@ Resources:
           - RegionalDemoDbAdminSecretArn
       Tier: Standard
       Type: String
-      Value: !Ref 'DemoDbAdminSecret'
-    Type: AWS::SSM::Parameter
-  RegionalDemoDbClusterArnParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Regional Demo DB Cluster ARN for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - RegionalDemoDbClusterArn
-      Tier: Standard
-      Type: String
-      Value: !GetAtt 'PrimaryDemoCluster.DBClusterArn'
-    Type: AWS::SSM::Parameter
-  RegionalDemoDbClusterIdentifierParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Regional Demo DB Cluster Identifier for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - RegionalDemoDbClusterIdentifier
-      Tier: Standard
-      Type: String
-      Value: !Ref 'PrimaryDemoCluster'
-    Type: AWS::SSM::Parameter
-  RegionalDemoDbClusterReaderEndpointParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Demo DB Cluster Reader Endpoint for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - RegionalDemoDbClusterReaderEndpoint
-      Tier: Standard
-      Type: String
-      Value: !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
-    Type: AWS::SSM::Parameter
-  RegionalDemoDbClusterWriterEndpointParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Demo DB Cluster Writer Endpoint for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - RegionalDemoDbClusterWriterEndpoint
-      Tier: Standard
-      Type: String
-      Value: !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
+      Value: !Join
+        - ':'
+        - - arn
+          - !Ref 'AWS::Partition'
+          - secretsmanager
+          - !Ref 'AWS::Region'
+          - !Ref 'AWS::AccountId'
+          - secret
+          - !Select
+            - 6
+            - !Split
+              - ':'
+              - !GetAtt 'PrimaryRegionDbExportRetriever.DemoDbAdminSecretArn'
     Type: AWS::SSM::Parameter
 Transform:
   Name: AWS::SecretsManager-2020-07-23

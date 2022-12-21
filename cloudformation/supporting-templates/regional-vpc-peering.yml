@@ -13,8 +13,17 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 13, 2022
-  Version: v1.03
+  LastUpdated: December 21, 2022
+  Version: v1.04
+Outputs:
+  PeeringConnectionIdExport:
+    Condition: IsPrimaryRegion
+    Export:
+      Name: !Join
+        - ''
+        - - !Ref 'MainStackName'
+          - -PeeringConnectionId
+    Value: !Ref 'PeeringInvitation'
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -66,6 +75,8 @@ Parameters:
     Default: 10.10.8.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
+  FailoverVpcId:
+    Type: String
   MainStackName:
     Type: String
   PrimaryDatabaseSubnetZoneACidr:
@@ -106,111 +117,108 @@ Parameters:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
+  PrimaryVpcId:
+    Type: String
   PrivateHostedZoneId:
     Type: String
   PublicFqdn:
-    Description: The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
+    Description: >-
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
       An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB.
+      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
+      Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
     Type: String
 Resources:
-  BasePathMapping:
-    DependsOn:
-      - DomainName
-      - Deployment
-      - DeploymentStage
+  PeeringInvitation:
+    Condition: IsPrimaryRegion
     Properties:
-      DomainName: !Join
-        - ''
-        - - api.
-          - !Ref 'PublicFqdn'
-      RestApiId: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /ApiId}}
-      Stage: v1
-    Type: AWS::ApiGateway::BasePathMapping
-  Deployment:
-    Properties:
-      Description: Initial Deployment
-      RestApiId: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /ApiId}}
-    Type: AWS::ApiGateway::Deployment
-  DeploymentStage:
-    DependsOn:
-      - Deployment
-    Properties:
-      DeploymentId: !Ref 'Deployment'
-      MethodSettings:
-        - CachingEnabled: false
-          DataTraceEnabled: true
-          HttpMethod: GET
-          LoggingLevel: INFO
-          MetricsEnabled: true
-          ResourcePath: /~1
-          ThrottlingBurstLimit: '5000'
-          ThrottlingRateLimit: '10000'
-        - CachingEnabled: false
-          DataTraceEnabled: true
-          HttpMethod: POST
-          LoggingLevel: INFO
-          MetricsEnabled: true
-          ResourcePath: /~1
-          ThrottlingBurstLimit: '5000'
-          ThrottlingRateLimit: '10000'
-      RestApiId: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /ApiId}}
-      StageName: v1
-    Type: AWS::ApiGateway::Stage
-  DnsRecord:
-    DependsOn:
-      - DomainName
-    Properties:
-      HostedZoneId: !Ref 'PublicHostedZoneId'
-      RecordSets:
-        - AliasTarget:
-            DNSName: !GetAtt 'DomainName.RegionalDomainName'
-            HostedZoneId: !GetAtt 'DomainName.RegionalHostedZoneId'
-          Name: !Join
+      PeerOwnerId: !Ref 'AWS::AccountId'
+      PeerRegion: !Ref 'FailoverRegionName'
+      PeerVpcId: !Ref 'FailoverVpcId'
+      Tags:
+        - Key: Name
+          Value: !Join
             - ''
-            - - api.
-              - !Ref 'PublicFqdn'
-          Type: A
-    Type: AWS::Route53::RecordSetGroup
-  DomainName:
+            - - !Ref 'MainStackName'
+              - '-'
+              - !Ref 'FailoverRegionName'
+      VpcId: !Ref 'PrimaryVpcId'
+    Type: AWS::EC2::VPCPeeringConnection
+  PrimaryRegionPeeringConnectionIdRetriever:
+    Condition: IsFailoverRegion
+    Properties:
+      Properties:
+        ExportPrefix: !Ref 'MainStackName'
+        Region: !Ref 'PrimaryRegionName'
+        Version: 1.05
+      ServiceToken: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /RegionalCfnExportRetrieverArn}}
+      Type: Custom::GetCFNExports
+      Version: '1.0'
+    Type: AWS::CloudFormation::CustomResource
+  ZoneARouteToFailoverRegion:
+    Condition: IsPrimaryRegion
     DependsOn:
-      - TlsCertificate
+      - PeeringInvitation
     Properties:
-      DomainName: !Join
+      DestinationCidrBlock: !Ref 'FailoverVpcCidr'
+      RouteTableId: !Join
         - ''
-        - - api.
-          - !Ref 'PublicFqdn'
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
-      RegionalCertificateArn: !Ref 'TlsCertificate'
-    Type: AWS::ApiGateway::DomainName
-  TlsCertificate:
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - A
+          - Id}}
+      VpcPeeringConnectionId: !Ref 'PeeringInvitation'
+    Type: AWS::EC2::Route
+  ZoneARouteToPrimaryRegion:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - PrimaryRegionPeeringConnectionIdRetriever
     Properties:
-      DomainName: !Join
+      DestinationCidrBlock: !Ref 'PrimaryVpcCidr'
+      RouteTableId: !Join
         - ''
-        - - api.
-          - !Ref 'PublicFqdn'
-      DomainValidationOptions:
-        - DomainName: !Join
-            - ''
-            - - api.
-              - !Ref 'PublicFqdn'
-          HostedZoneId: !Ref 'PublicHostedZoneId'
-      ValidationMethod: DNS
-    Type: AWS::CertificateManager::Certificate
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - A
+          - Id}}
+      VpcPeeringConnectionId: !GetAtt 'PrimaryRegionPeeringConnectionIdRetriever.PeeringConnectionId'
+    Type: AWS::EC2::Route
+  ZoneBRouteToFailoverRegion:
+    Condition: IsPrimaryRegion
+    DependsOn:
+      - PeeringInvitation
+    Properties:
+      DestinationCidrBlock: !Ref 'FailoverVpcCidr'
+      RouteTableId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - B
+          - Id}}
+      VpcPeeringConnectionId: !Ref 'PeeringInvitation'
+    Type: AWS::EC2::Route
+  ZoneBRouteToPrimaryRegion:
+    Condition: IsFailoverRegion
+    DependsOn:
+      - PrimaryRegionPeeringConnectionIdRetriever
+    Properties:
+      DestinationCidrBlock: !Ref 'PrimaryVpcCidr'
+      RouteTableId: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /PrivateRouteTableZone
+          - B
+          - Id}}
+      VpcPeeringConnectionId: !GetAtt 'PrimaryRegionPeeringConnectionIdRetriever.PeeringConnectionId'
+    Type: AWS::EC2::Route
