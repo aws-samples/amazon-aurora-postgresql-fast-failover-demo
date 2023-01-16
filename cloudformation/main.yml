@@ -89,7 +89,7 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 21, 2022
+  LastUpdated: December 20, 2022
   Version: v1.04
 Outputs:
   CrossRegionFailoverDemoUrl:
@@ -331,7 +331,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -631,7 +631,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           ApiId:
@@ -910,7 +910,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -2102,7 +2102,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -3303,7 +3303,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -4625,7 +4625,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -5361,7 +5361,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           RegionalCfnExportRetrieverArn:
@@ -5953,7 +5953,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -6423,7 +6423,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           GlobalAppDbClusterIdentifier:
@@ -7551,7 +7551,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Parameters:
           CodeDownloadUrl:
@@ -8857,7 +8857,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           DatabaseSubnetZoneAId:
@@ -9673,7 +9673,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           GlobalAppDbClusterIdentifier:
@@ -11271,7 +11271,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           PeeringConnectionIdExport:
@@ -11581,7 +11581,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: December 21, 2022
+          LastUpdated: December 20, 2022
           Version: v1.04
         Outputs:
           WebLoadBalancerFqdn:
