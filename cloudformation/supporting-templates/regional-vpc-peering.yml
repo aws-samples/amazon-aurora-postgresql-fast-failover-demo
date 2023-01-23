@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 21, 2022
-  Version: v1.04
+  LastUpdated: January 23, 2023
+  Version: v1.05
 Outputs:
   PeeringConnectionIdExport:
     Condition: IsPrimaryRegion
@@ -27,8 +27,7 @@ Outputs:
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
-    Description: The URL from which the supporting codebase can be downloaded. This
-      codebase is used to deploy the demo dashboard.
+    Description: The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.
     Type: String
   DatabaseAdminPassword:
     Description: The password to be used for the RDS Aurora admin account.
@@ -47,9 +46,8 @@ Parameters:
     Type: String
   FailoverKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -68,8 +66,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
-    Description: The name of the failover region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
     Default: 10.10.8.0/21
@@ -89,9 +86,8 @@ Parameters:
     Type: String
   PrimaryKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -110,8 +106,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   PrimaryRegionName:
-    Description: The name of the primary region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
@@ -123,10 +118,8 @@ Parameters:
     Type: String
   PublicFqdn:
     Description: >-
-      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
-      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
-      Route 53 Hosted Zone.
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
+      record currently defined in the corresponding Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.

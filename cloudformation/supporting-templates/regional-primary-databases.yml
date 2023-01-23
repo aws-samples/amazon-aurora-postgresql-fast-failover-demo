@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 21, 2022
-  Version: v1.04
+  LastUpdated: January 23, 2023
+  Version: v1.05
 Outputs:
   GlobalAppDbClusterIdentifier:
     Condition: ''
@@ -122,8 +122,7 @@ Outputs:
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
-    Description: The URL from which the supporting codebase can be downloaded. This
-      codebase is used to deploy the demo dashboard.
+    Description: The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.
     Type: String
   DatabaseAdminPassword:
     Description: The password to be used for the RDS Aurora admin account.
@@ -142,9 +141,8 @@ Parameters:
     Type: String
   FailoverKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -163,8 +161,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
-    Description: The name of the failover region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
     Default: 10.10.8.0/21
@@ -182,9 +179,8 @@ Parameters:
     Type: String
   PrimaryKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -203,8 +199,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   PrimaryRegionName:
-    Description: The name of the primary region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
@@ -214,10 +209,8 @@ Parameters:
     Type: String
   PublicFqdn:
     Description: >-
-      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
-      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
-      Route 53 Hosted Zone.
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
+      record currently defined in the corresponding Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -234,14 +227,10 @@ Resources:
       Properties:
         DatabaseIdentifier: App
         QueriesToExecute:
-          - "\n                    CREATE SEQUENCE IF NOT EXISTS data_sequence start\
-            \ 1 increment 1;\n                    "
-          - "\n                    CREATE TABLE IF NOT EXISTS dataserver (\n     \
-            \                   id integer not null primary key default nextval('data_sequence'),\n\
-            \                        guid VARCHAR(255) NOT NULL,\n               \
-            \         insertedon timestamp NOT NULL DEFAULT NOW(),\n             \
-            \           migratedon timestamp NOT NULL DEFAULT NOW()\n            \
-            \        );\n                    "
+          - "\n                    CREATE SEQUENCE IF NOT EXISTS data_sequence start 1 increment 1;\n                    "
+          - "\n                    CREATE TABLE IF NOT EXISTS dataserver (\n                        id integer not null primary key default nextval('data_sequence'),\n                        guid VARCHAR(255)\
+            \ NOT NULL,\n                        insertedon timestamp NOT NULL DEFAULT NOW(),\n                        migratedon timestamp NOT NULL DEFAULT NOW()\n                    );\n             \
+            \       "
       ServiceToken: !GetAtt 'DatabasePreparer.Arn'
       Type: Custom::ExecuteQueriesAgainstDatabase
       Version: '1.0'
@@ -482,33 +471,17 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\nimport subprocess\n\nimport\
-          \ os\nimport json\nimport boto3\nimport psycopg2\nimport cfnresponse\nimport\
-          \ multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\
-          \ncustom_functions = multi_region_db.Functions()\n\n'''\n    RDSAdminSecretArn\n\
-          '''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n\
-          \    \n    if 'Properties' in event['ResourceProperties']:\n        arguments\
-          \ = event['ResourceProperties']['Properties']\n        \n    operation =\
-          \ event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n  \
-          \  response_data = {}\n    \n    if event['RequestType'] in ['Create', 'Update']:\n\
-          \        \n        db_credentials = custom_functions.get_db_credentials(arguments['DatabaseIdentifier'])\n\
-          \        \n        try:\n                \n            db_conn = psycopg2.connect(\n\
-          \                host = db_credentials['host'],\n                port =\
-          \ db_credentials['port'],\n                user = db_credentials['username'],\n\
-          \                password = db_credentials['password'],\n              \
-          \  database = db_credentials['database'],\n                connect_timeout\
-          \ = 3,\n                sslmode = 'require',\n            )\n          \
-          \  \n            curs = db_conn.cursor()\n            \n            for\
-          \ query in arguments['QueriesToExecute']:\n                \n          \
-          \      curs.execute(query.replace('\\r','').replace('\\n',' '))\n      \
-          \          db_conn.commit()\n            \n            curs.close()\n  \
-          \          db_conn.close()\n        \n        except Exception as error:\n\
-          \n            print('There was a problem executing the DDL statements: '\
-          \ + str(error))\n            return cfnresponse.send(event, context, cfnresponse.FAILED,\
-          \ response_data)\n            \n    return cfnresponse.send(event, context,\
-          \ cfnresponse.SUCCESS, response_data)"
-      Description: Executes DDL statements against new DB clusters to create necessary
-        schema
+        ZipFile: "import sys\nsys.path.append('/opt')\nimport subprocess\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport cfnresponse\nimport multi_region_db\nfrom botocore.exceptions import\
+          \ ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\n'''\n    RDSAdminSecretArn\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n   \
+          \ \n    if 'Properties' in event['ResourceProperties']:\n        arguments = event['ResourceProperties']['Properties']\n        \n    operation = event['ResourceProperties']['Type'].replace('Custom::',\
+          \ '')\n    \n    response_data = {}\n    \n    if event['RequestType'] in ['Create', 'Update']:\n        \n        db_credentials = custom_functions.get_db_credentials(arguments['DatabaseIdentifier'])\n\
+          \        \n        try:\n                \n            db_conn = psycopg2.connect(\n                host = db_credentials['host'],\n                port = db_credentials['port'],\n           \
+          \     user = db_credentials['username'],\n                password = db_credentials['password'],\n                database = db_credentials['database'],\n                connect_timeout = 3,\n\
+          \                sslmode = 'require',\n            )\n            \n            curs = db_conn.cursor()\n            \n            for query in arguments['QueriesToExecute']:\n               \
+          \ \n                curs.execute(query.replace('\\r','').replace('\\n',' '))\n                db_conn.commit()\n            \n            curs.close()\n            db_conn.close()\n        \n\
+          \        except Exception as error:\n\n            print('There was a problem executing the DDL statements: ' + str(error))\n            return cfnresponse.send(event, context, cfnresponse.FAILED,\
+          \ response_data)\n            \n    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)"
+      Description: Executes DDL statements against new DB clusters to create necessary schema
       Environment:
         Variables:
           REGIONAL_APP_DB_SECRET_ARN: !Ref 'AppDbAdminSecret'
@@ -735,16 +708,11 @@ Resources:
       Properties:
         DatabaseIdentifier: Demo
         QueriesToExecute:
-          - "\n                    CREATE TABLE IF NOT EXISTS dataclient (\n     \
-            \                   guid character varying(255) COLLATE pg_catalog.\"\
-            default\" NOT NULL,\n                        primary_region integer NOT\
-            \ NULL,\n                        failover_region integer NOT NULL,\n \
-            \                       http_code integer,\n                        insertedon\
-            \ time without time zone\n                    );\n                    "
-          - "\n                    CREATE TABLE IF NOT EXISTS failoverevents (\n \
-            \                       event integer NOT NULL,\n                    \
-            \    insertedon timestamp without time zone NOT NULL\n               \
-            \     );\n                    "
+          - "\n                    CREATE TABLE IF NOT EXISTS dataclient (\n                        guid character varying(255) COLLATE pg_catalog.\"default\" NOT NULL,\n                        primary_region\
+            \ integer NOT NULL,\n                        failover_region integer NOT NULL,\n                        http_code integer,\n                        insertedon time without time zone\n      \
+            \              );\n                    "
+          - "\n                    CREATE TABLE IF NOT EXISTS failoverevents (\n                        event integer NOT NULL,\n                        insertedon timestamp without time zone NOT NULL\n\
+            \                    );\n                    "
       ServiceToken: !GetAtt 'DatabasePreparer.Arn'
       Type: Custom::ExecuteQueriesAgainstDatabase
       Version: '1.0'

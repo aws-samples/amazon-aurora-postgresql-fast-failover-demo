@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "December 21, 2022",
-  "Version": "v1.04"
+  "LastUpdated": "January 23, 2023",
+  "Version": "v1.05"
  },
  "Outputs": {
   "DatabaseSubnetZoneAId": {
@@ -170,7 +170,7 @@
    "Type": "String"
   },
   "FailoverRegionName": {
-   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.",
    "Type": "String"
   },
   "FailoverVpcCidr": {
@@ -216,7 +216,7 @@
    "Type": "String"
   },
   "PrimaryRegionName": {
-   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services.",
+   "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.",
    "Type": "String"
   },
   "PrimaryVpcCidr": {

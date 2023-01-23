@@ -13,13 +13,12 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 21, 2022
-  Version: v1.04
+  LastUpdated: January 23, 2023
+  Version: v1.05
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
-    Description: The URL from which the supporting codebase can be downloaded. This
-      codebase is used to deploy the demo dashboard.
+    Description: The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.
     Type: String
   DatabaseAdminPassword:
     Description: The password to be used for the RDS Aurora admin account.
@@ -38,9 +37,8 @@ Parameters:
     Type: String
   FailoverKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -59,8 +57,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
-    Description: The name of the failover region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
     Default: 10.10.8.0/21
@@ -78,9 +75,8 @@ Parameters:
     Type: String
   PrimaryKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -99,8 +95,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   PrimaryRegionName:
-    Description: The name of the primary region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
@@ -110,10 +105,8 @@ Parameters:
     Type: String
   PublicFqdn:
     Description: >-
-      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
-      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
-      Route 53 Hosted Zone.
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
+      record currently defined in the corresponding Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -126,18 +119,11 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import os\nimport json\nimport boto3\n\ndef handler(event, context):\n\
-          \    \n    print(json.dumps(event))\n    \n    data = {}\n    rds_client\
-          \ = boto3.client('rds')\n\n    cluster_resp = rds_client.describe_db_clusters(\n\
-          \        DBClusterIdentifier = os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n\
-          \    )\n        \n    for member in cluster_resp['DBClusters'][0]['DBClusterMembers']:\n\
-          \        \n        instance_resp = rds_client.describe_db_instances(\n \
-          \           DBInstanceIdentifier = member['DBInstanceIdentifier']\n    \
-          \    )\n        \n        data[member['DBInstanceIdentifier']] = {\n   \
-          \         'az': instance_resp['DBInstances'][0]['AvailabilityZone'],\n \
-          \           'type': 'WRITER' if member['IsClusterWriter'] is True else 'READER'\n\
-          \        }\n        \n    return {\n        'code': 200,\n        'body':\
-          \ json.dumps(data)\n    }"
+        ZipFile: "import os\nimport json\nimport boto3\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    data = {}\n    rds_client = boto3.client('rds')\n\n    cluster_resp\
+          \ = rds_client.describe_db_clusters(\n        DBClusterIdentifier = os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n    )\n        \n    for member in cluster_resp['DBClusters'][0]['DBClusterMembers']:\n\
+          \        \n        instance_resp = rds_client.describe_db_instances(\n            DBInstanceIdentifier = member['DBInstanceIdentifier']\n        )\n        \n        data[member['DBInstanceIdentifier']]\
+          \ = {\n            'az': instance_resp['DBInstances'][0]['AvailabilityZone'],\n            'type': 'WRITER' if member['IsClusterWriter'] is True else 'READER'\n        }\n        \n    return\
+          \ {\n        'code': 200,\n        'body': json.dumps(data)\n    }"
       Description: Retrieves DB cluster info
       Environment:
         Variables:
@@ -247,9 +233,7 @@ Resources:
             StatusCode: '500'
         PassthroughBehavior: WHEN_NO_TEMPLATES
         RequestTemplates:
-          application/json: "#set($params = $input.params())\n{\n\"queryParams\":\
-            \ { #set($paramSet = $params.get('querystring')) #foreach($paramName in\
-            \ $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
+          application/json: "#set($params = $input.params())\n{\n\"queryParams\": { #set($paramSet = $params.get('querystring')) #foreach($paramName in $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
             \ #if($foreach.hasNext),#end #end }\n}"
         Type: AWS
         Uri: !Join
@@ -435,25 +419,13 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
-          import psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\
-          \        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n\
-          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
-          \    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
-          \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
-          \        password = demo_db_credentials['password'],\n        database =\
-          \ demo_db_credentials['database'],\n        connect_timeout = 3,\n     \
-          \   sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n\
-          \    \n    curs.execute('''\n        SELECT \n            event,\n     \
-          \       to_char(insertedon,'HH24:MI:SS') AS time, \n            insertedon\
-          \ \n        FROM failoverevents\n        ORDER BY insertedon\n    ''');\n\
-          \    \n    failover_events = curs.fetchall()\n    \n    curs.close()\n \
-          \   db_conn.close()\n    \n    records_to_return = []\n    \n    for x in\
-          \ failover_events:\n    \n        c = 0\n        temp2 = {}\n        \n\
-          \        for col in curs.description:\n            \n            temp2.update({str(col[0]):\
-          \ x[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n\
-          \    \n    return {\n        'code': 200,\n        'body': json.dumps(records_to_return,\
-          \ default = str)\n    }"
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n\
+          \    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
+          \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
+          \        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    \n    curs.execute('''\n        SELECT \n            event,\n            to_char(insertedon,'HH24:MI:SS')\
+          \ AS time, \n            insertedon \n        FROM failoverevents\n        ORDER BY insertedon\n    ''');\n    \n    failover_events = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n\
+          \    \n    records_to_return = []\n    \n    for x in failover_events:\n    \n        c = 0\n        temp2 = {}\n        \n        for col in curs.description:\n            \n            temp2.update({str(col[0]):\
+          \ x[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n    \n    return {\n        'code': 200,\n        'body': json.dumps(records_to_return, default = str)\n    }"
       Description: Retrieves failover events from the database
       Environment:
         Variables:
@@ -568,9 +540,7 @@ Resources:
             StatusCode: '500'
         PassthroughBehavior: WHEN_NO_TEMPLATES
         RequestTemplates:
-          application/json: "#set($params = $input.params())\n{\n\"queryParams\":\
-            \ { #set($paramSet = $params.get('querystring')) #foreach($paramName in\
-            \ $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
+          application/json: "#set($params = $input.params())\n{\n\"queryParams\": { #set($paramSet = $params.get('querystring')) #foreach($paramName in $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
             \ #if($foreach.hasNext),#end #end }\n}"
         Type: AWS
         Uri: !Join
@@ -756,27 +726,15 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
-          import boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport\
-          \ multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\
-          \ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n\
-          \    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
-          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
-          \    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
-          \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
-          \        sslmode = 'require',\n        password = demo_db_credentials['password'],\n\
-          \        database = demo_db_credentials['database'],\n        connect_timeout\
-          \ = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT\
-          \ INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz\
-          \ = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n\
-          \    \n    curs.close()\n    db_conn.close()\n    \n    try:\n        \n\
-          \        boto3.client('ec2').replace_network_acl_entry(\n            Egress\
-          \ = False, \n            CidrBlock = '0.0.0.0/0',\n            NetworkAclId\
-          \ = os.environ['REGIONAL_APP_DB_NACL_ID'],\n            Protocol = '-1',\n\
-          \            RuleAction = 'deny',\n            RuleNumber = 100\n      \
-          \  )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed\
-          \ to Update Database NACL')\n    \n    return {\n        'code': 200,\n\
-          \        'body': json.dumps([])\n    }"
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport multi_region_db\nfrom botocore.exceptions import\
+          \ ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
+          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port\
+          \ = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
+          \        connect_timeout = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz = eastern).strftime(\"\
+          %m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \n    try:\n        \n        boto3.client('ec2').replace_network_acl_entry(\n         \
+          \   Egress = False, \n            CidrBlock = '0.0.0.0/0',\n            NetworkAclId = os.environ['REGIONAL_APP_DB_NACL_ID'],\n            Protocol = '-1',\n            RuleAction = 'deny',\n\
+          \            RuleNumber = 100\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Update Database NACL')\n    \n    return {\n        'code': 200,\n \
+          \       'body': json.dumps([])\n    }"
       Description: Updates the database NACL to deny incoming traffic
       Environment:
         Variables:
@@ -897,9 +855,7 @@ Resources:
             StatusCode: '500'
         PassthroughBehavior: WHEN_NO_TEMPLATES
         RequestTemplates:
-          application/json: "#set($params = $input.params())\n{\n\"queryParams\":\
-            \ { #set($paramSet = $params.get('querystring')) #foreach($paramName in\
-            \ $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
+          application/json: "#set($params = $input.params())\n{\n\"queryParams\": { #set($paramSet = $params.get('querystring')) #foreach($paramName in $paramSet.keySet()) \"$paramName\" : \"$util.escapeJavaScript($paramSet.get($paramName))\"\
             \ #if($foreach.hasNext),#end #end }\n}"
         Type: AWS
         Uri: !Join

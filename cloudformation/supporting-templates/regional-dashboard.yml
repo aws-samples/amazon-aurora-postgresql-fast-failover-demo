@@ -13,13 +13,12 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 21, 2022
-  Version: v1.04
+  LastUpdated: January 23, 2023
+  Version: v1.05
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
-    Description: The URL from which the supporting codebase can be downloaded. This
-      codebase is used to deploy the demo dashboard.
+    Description: The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.
     Type: String
   DatabaseAdminPassword:
     Description: The password to be used for the RDS Aurora admin account.
@@ -38,9 +37,8 @@ Parameters:
     Type: String
   FailoverKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -59,8 +57,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
-    Description: The name of the failover region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
     Default: 10.10.8.0/21
@@ -78,9 +75,8 @@ Parameters:
     Type: String
   PrimaryKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -99,8 +95,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   PrimaryRegionName:
-    Description: The name of the primary region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
@@ -110,10 +105,8 @@ Parameters:
     Type: String
   PublicFqdn:
     Description: >-
-      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
-      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
-      Route 53 Hosted Zone.
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
+      record currently defined in the corresponding Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -122,6 +115,10 @@ Resources:
   Bucket:
     Properties:
       AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -206,36 +203,19 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys,subprocess\nsubprocess.call('pip install cfnresponse\
-          \ -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n\
-          sys.path.insert(1,'/tmp/')\nimport os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\n\
-          from collections import defaultdict\nfrom botocore.exceptions import ClientError\
-          \ as boto3_client_error\nhttp=urllib3.PoolManager()\ntry:from urllib2 import\
-          \ HTTPError,build_opener,HTTPHandler,Request\nexcept ImportError:from urllib.error\
-          \ import HTTPError;from urllib.request import build_opener,HTTPHandler,Request\n\
-          '\\n    - CodeBucketName | str\\n    - CodeDownloadUrl | str\\n'\ndef handler(event,context):\n\
-          \tb='VersionId';a='Key';Z='/dashboard/';Y=True;X=False;W='RequestType';P='CodeBucketName';D=context;A=event;print(json.dumps(A));C=A['ResourceProperties']['Properties'];E=boto3.client('s3');F={}\n\
-          \tif A[W]in['Create','Update']:\n\t\tG='/tmp/dashboard_code.zip';J=G.replace('.zip','');'\\\
-          n            Download the codebase\\n        ';Q=urllib3.PoolManager();K=Q.request('GET',C['CodeDownloadUrl'],preload_content=X)\n\
-          \t\tif K.status!=200:return X\n\t\twith K as R,open(G,'wb')as S:shutil.copyfileobj(R,S)\n\
-          \t\t'\\n            Unzip the downloaded code\\n        '\n\t\twith zipfile.ZipFile(G,'r')as\
-          \ T:T.extractall(J)\n\t\t'\\n            For each file in the local code\
-          \ directory\\n        '\n\t\tfor B in glob.iglob(J+'**/**',recursive=Y):\n\
-          \t\t\t\"\\n                If it's one of the dashboard files and it's a\
-          \ file, not a directory, we'll upload it to S3\\n            \"\n\t\t\t\
-          if Z in B and os.path.isfile(B):\n\t\t\t\ttry:U=B.split(Z)[1];E.upload_file(B,C[P],U,ExtraArgs={'ContentType':mimetypes.guess_type(B)[0]})\n\
-          \t\t\t\texcept boto3_client_error as H:print('Failed to Upload Dashboard\
-          \ File: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\t\
-          elif A[W]in['Delete']:\n\t\t\"\\n            Here, we'll delete all objects,\
-          \ versions, and delete markers from the bucket.\\n        \";V=E.get_paginator('list_object_versions');I=[]\n\
-          \t\tfor L in V.paginate(Bucket=C[P]):\n\t\t\tfor M in ['Versions','DeleteMarkers']:\n\
-          \t\t\t\tif M in L:\n\t\t\t\t\tfor N in L[M]:I.append({a:N[a],b:N[b]})\n\t\
-          \tfor O in range(0,len(I),1000):\n\t\t\ttry:c=E.delete_objects(Bucket=C[P],Delete={'Objects':I[O:O+1000],'Quiet':Y})\n\
-          \t\t\texcept boto3_client_error as H:print('Failed to Delete S3 Objects:\
-          \ '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\treturn\
-          \ cfnresponse.send(A,D,cfnresponse.SUCCESS,F)"
-      Description: Downloads dashboard code from a remote repo and deploys it to Amazon
-        S3
+        ZipFile: "import sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\nimport\
+          \ os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\nfrom collections import defaultdict\nfrom botocore.exceptions import ClientError as boto3_client_error\nhttp=urllib3.PoolManager()\n\
+          try:from urllib2 import HTTPError,build_opener,HTTPHandler,Request\nexcept ImportError:from urllib.error import HTTPError;from urllib.request import build_opener,HTTPHandler,Request\n'\\n    -\
+          \ CodeBucketName | str\\n    - CodeDownloadUrl | str\\n'\ndef handler(event,context):\n\tU='VersionId';T='Key';S='/dashboard/';R=False;Q='RequestType';J='CodeBucketName';D=context;A=event;print(json.dumps(A));C=A['ResourceProperties']['Properties'];E=boto3.client('s3');F={}\n\
+          \tif A[Q]in['Create','Update']:\n\t\tG='/tmp/dashboard_code.zip';K=G.replace('.zip','');'\\n            Download the codebase\\n        ';V=urllib3.PoolManager();L=V.request('GET',C['CodeDownloadUrl'],preload_content=R)\n\
+          \t\tif L.status!=200:return R\n\t\twith L as W,open(G,'wb')as X:shutil.copyfileobj(W,X)\n\t\t'\\n            Unzip the downloaded code\\n        '\n\t\twith zipfile.ZipFile(G,'r')as Y:Y.extractall(K)\n\
+          \t\t'\\n            For each file in the local code directory\\n        '\n\t\tfor B in glob.iglob(K+'**/**',recursive=True):\n\t\t\t\"\\n                If it's one of the dashboard files and\
+          \ it's a file, not a directory, we'll upload it to S3\\n            \"\n\t\t\tif S in B and os.path.isfile(B):\n\t\t\t\ttry:Z=B.split(S)[1];E.upload_file(B,C[J],Z,ExtraArgs={'ContentType':mimetypes.guess_type(B)[0]})\n\
+          \t\t\t\texcept boto3_client_error as H:print('Failed to Upload Dashboard File: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\telif A[Q]in['Delete']:\n\t\t\"\\n            Here,\
+          \ we'll delete all objects, versions, and delete markers from the bucket.\\n        \";a=E.get_paginator('list_object_versions');I=[]\n\t\tfor M in a.paginate(Bucket=C[J]):\n\t\t\tfor N in ['Versions','DeleteMarkers']:\n\
+          \t\t\t\tif N in M:\n\t\t\t\t\tfor O in M[N]:I.append({T:O[T],U:O[U]})\n\t\tfor P in range(0,len(I),1000):\n\t\t\ttry:b=E.delete_objects(Bucket=C[J],Delete={'Objects':I[P:P+1000],'Quiet':True})\n\
+          \t\t\texcept boto3_client_error as H:print('Failed to Delete S3 Objects: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\treturn cfnresponse.send(A,D,cfnresponse.SUCCESS,F)"
+      Description: Downloads dashboard code from a remote repo and deploys it to Amazon S3
       Environment:
         Variables:
           CODE_BUCKET_NAME: !Ref 'Bucket'

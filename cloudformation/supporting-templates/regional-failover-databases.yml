@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: December 21, 2022
-  Version: v1.04
+  LastUpdated: January 23, 2023
+  Version: v1.05
 Outputs:
   GlobalAppDbClusterIdentifier:
     Condition: ''
@@ -114,8 +114,7 @@ Outputs:
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
-    Description: The URL from which the supporting codebase can be downloaded. This
-      codebase is used to deploy the demo dashboard.
+    Description: The URL from which the supporting codebase can be downloaded. This codebase is used to deploy the demo dashboard.
     Type: String
   DatabaseAdminPassword:
     Description: The password to be used for the RDS Aurora admin account.
@@ -134,9 +133,8 @@ Parameters:
     Type: String
   FailoverKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -155,8 +153,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
-    Description: The name of the failover region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
     Default: 10.10.8.0/21
@@ -174,9 +171,8 @@ Parameters:
     Type: String
   PrimaryKmsKeyArn:
     Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets
-      Manager). This must correspond to a multi-region CMK available in both the primary
-      and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
+      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
+      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -195,8 +191,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   PrimaryRegionName:
-    Description: The name of the primary region (e.g., us-east-1). You may choose
-      any AWS Region that supports the required services.
+    Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
@@ -206,10 +201,8 @@ Parameters:
     Type: String
   PublicFqdn:
     Description: >-
-      The FQDN to be used by this application (e.g., multi-region-aurora.example.com).
-      An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon
-      ALB. This FQDN should NOT have a DNS record currently defined in the corresponding
-      Route 53 Hosted Zone.
+      The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
+      record currently defined in the corresponding Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
     Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
@@ -727,52 +720,24 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\n\
-          import time\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions\
-          \ import ClientError as boto3_client_error\n\n'''\n    ClusterArn\n    ClusterIdentifier\n\
-          '''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n\
-          \    \n    arguments = event['ResourceProperties']['Properties']\n    operation\
-          \ = event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n\
-          \    response_data = {}\n    \n    if event['RequestType'] in ['Delete']:\n\
-          \        \n        rds_client = boto3.client('rds')\n        \n        try:\n\
-          \            \n            '''\n                First, we'll get the cluster's\
-          \ current status\n            '''\n            describe_cluster_resp = rds_client.describe_db_clusters(\n\
-          \                DBClusterIdentifier = arguments['ClusterArn'],\n      \
-          \      )\n            \n            '''\n                If there's a cluster\
-          \ matching this identifier\n            '''\n            if len(describe_cluster_resp)\
-          \ > 0:\n                \n                cluster_status = describe_cluster_resp['DBClusters'][0]['Status']\n\
-          \                \n                '''\n                    If the cluster's\
-          \ current status is AVAILABLE\n                '''\n                if cluster_status\
-          \ in ['available']:\n                    \n                    try:\n  \
-          \                      \n                        '''\n                 \
-          \           We'll try to delete it\n                        '''\n      \
-          \                  rds_client.delete_db_cluster(\n                     \
-          \       SkipFinalSnapshot = True,\n                            DBClusterIdentifier\
-          \ = arguments['ClusterIdentifier']\n                        )\n        \
-          \                \n                        '''\n                       \
-          \     Now, we'll monitor its deletion and respond only after it's successful.\n\
-          \                        '''\n                        while True:\n    \
-          \                        \n                            try:\n          \
-          \                      \n                                describe_cluster_resp\
-          \ = rds_client.describe_db_clusters(\n                                 \
-          \   DBClusterIdentifier = arguments['ClusterArn'],\n                   \
-          \             )\n\n                                time.sleep(5)\n     \
-          \                           \n                            except boto3_client_error\
-          \ as e:\n                                \n                            \
-          \    if e.response['Error']['Code'] == 'DBClusterNotFoundFault':\n     \
-          \                               return cfnresponse.send(event, context,\
-          \ cfnresponse.SUCCESS, response_data)\n                                \n\
-          \                                else:\n                               \
-          \     print('Failed to Retrieve Cluster: ' + str(e.response))\n        \
-          \                            return cfnresponse.send(event, context, cfnresponse.FAILED,\
-          \ response_data)\n                            \n                    except\
-          \ boto3_client_error as e:\n                        print('Failed to Delete\
-          \ Cluster: ' + str(e.response))\n                        return cfnresponse.send(event,\
-          \ context, cfnresponse.FAILED, response_data)\n                \n      \
-          \  except boto3_client_error as e:\n            print('Failed to Retrieve\
-          \ Cluster: ' + str(e.response))\n            return cfnresponse.send(event,\
-          \ context, cfnresponse.FAILED, response_data)\n\n    return cfnresponse.send(event,\
-          \ context, cfnresponse.SUCCESS, response_data)"
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport time\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError as boto3_client_error\n\n'''\n\
+          \    ClusterArn\n    ClusterIdentifier\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation =\
+          \ event['ResourceProperties']['Type'].replace('Custom::', '')\n    \n    response_data = {}\n    \n    if event['RequestType'] in ['Delete']:\n        \n        rds_client = boto3.client('rds')\n\
+          \        \n        try:\n            \n            '''\n                First, we'll get the cluster's current status\n            '''\n            describe_cluster_resp = rds_client.describe_db_clusters(\n\
+          \                DBClusterIdentifier = arguments['ClusterArn'],\n            )\n            \n            '''\n                If there's a cluster matching this identifier\n            '''\n\
+          \            if len(describe_cluster_resp) > 0:\n                \n                cluster_status = describe_cluster_resp['DBClusters'][0]['Status']\n                \n                '''\n  \
+          \                  If the cluster's current status is AVAILABLE\n                '''\n                if cluster_status in ['available']:\n                    \n                    try:\n    \
+          \                    \n                        '''\n                            We'll try to delete it\n                        '''\n                        rds_client.delete_db_cluster(\n   \
+          \                         SkipFinalSnapshot = True,\n                            DBClusterIdentifier = arguments['ClusterIdentifier']\n                        )\n                        \n   \
+          \                     '''\n                            Now, we'll monitor its deletion and respond only after it's successful.\n                        '''\n                        while True:\n\
+          \                            \n                            try:\n                                \n                                describe_cluster_resp = rds_client.describe_db_clusters(\n  \
+          \                                  DBClusterIdentifier = arguments['ClusterArn'],\n                                )\n\n                                time.sleep(5)\n                        \
+          \        \n                            except boto3_client_error as e:\n                                \n                                if e.response['Error']['Code'] == 'DBClusterNotFoundFault':\n\
+          \                                    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)\n                                \n                                else:\n    \
+          \                                print('Failed to Retrieve Cluster: ' + str(e.response))\n                                    return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n\
+          \                            \n                    except boto3_client_error as e:\n                        print('Failed to Delete Cluster: ' + str(e.response))\n                        return\
+          \ cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n                \n        except boto3_client_error as e:\n            print('Failed to Retrieve Cluster: ' + str(e.response))\n\
+          \            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n\n    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)"
       Description: Deletes the failover cluster once the local instances are deleted
       Handler: index.handler
       Layers:
