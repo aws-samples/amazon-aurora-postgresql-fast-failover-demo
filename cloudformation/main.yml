@@ -6,6 +6,11 @@ Metadata:
         Parameters:
           - CodeDownloadUrl
       - Label:
+          default: Accessibility
+        Parameters:
+          - PublicHostedZoneId
+          - PublicFqdn
+      - Label:
           default: Database
         Parameters:
           - DatabaseAdminUsername
@@ -34,11 +39,6 @@ Metadata:
           - FailoverDatabaseSubnetZoneACidr
           - FailoverDatabaseSubnetZoneBCidr
           - FailoverKmsKeyArn
-      - Label:
-          default: Accessibility
-        Parameters:
-          - PublicFqdn
-          - PublicHostedZoneId
     ParameterLabels:
       CodeDownloadUrl:
         default: Download URL
@@ -47,49 +47,49 @@ Metadata:
       DatabaseAdminUsername:
         default: Admin Username
       FailoverDatabaseSubnetZoneACidr:
-        default: Database Subnet Zone A CIDR
+        default: Failover Region Database Subnet Zone A CIDR
       FailoverDatabaseSubnetZoneBCidr:
-        default: Database Subnet Zone B CIDR
+        default: Failover Region Database Subnet Zone B CIDR
       FailoverKmsKeyArn:
-        default: KMS Key ARN
+        default: Failover Region KMS Key ARN
       FailoverPrivateSubnetZoneACidr:
-        default: Private Subnet Zone A CIDR
+        default: Failover Region Private Subnet Zone A CIDR
       FailoverPrivateSubnetZoneBCidr:
-        default: Private Subnet Zone B CIDR
+        default: Failover Region Private Subnet Zone B CIDR
       FailoverPublicSubnetZoneACidr:
-        default: Public Subnet Zone A CIDR
+        default: Failover Region Public Subnet Zone A CIDR
       FailoverPublicSubnetZoneBCidr:
-        default: Public Subnet Zone B CIDR
+        default: Failover Region Public Subnet Zone B CIDR
       FailoverRegionName:
-        default: Region Name
+        default: Failover Region Name
       FailoverVpcCidr:
-        default: VPC CIDR
+        default: Failover Region VPC CIDR
       PrimaryDatabaseSubnetZoneACidr:
-        default: Database Subnet Zone A CIDR
+        default: Primary Region Database Subnet Zone A CIDR
       PrimaryDatabaseSubnetZoneBCidr:
-        default: Database Subnet Zone B CIDR
+        default: Primary Region Database Subnet Zone B CIDR
       PrimaryKmsKeyArn:
-        default: KMS Key ARN
+        default: Primary Region KMS Key ARN
       PrimaryPrivateSubnetZoneACidr:
-        default: Private Subnet Zone A CIDR
+        default: Primary Region Private Subnet Zone A CIDR
       PrimaryPrivateSubnetZoneBCidr:
-        default: Private Subnet Zone B CIDR
+        default: Primary Region Private Subnet Zone B CIDR
       PrimaryPublicSubnetZoneACidr:
-        default: Public Subnet Zone A CIDR
+        default: Primary Region Public Subnet Zone A CIDR
       PrimaryPublicSubnetZoneBCidr:
-        default: Public Subnet Zone B CIDR
+        default: Primary Region Public Subnet Zone B CIDR
       PrimaryRegionName:
-        default: Region Name
+        default: Primary Region Name
       PrimaryVpcCidr:
-        default: VPC CIDR
+        default: Primary Region VPC CIDR
       PublicFqdn:
-        default: Service FQDN
+        default: Public Service FQDN
       PublicHostedZoneId:
-        default: Hosted Zone ID
+        default: Public Hosted Zone ID
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 23, 2023
+  LastUpdated: January 24, 2023
   Version: v1.05
 Outputs:
   CrossRegionFailoverDemoUrl:
@@ -170,6 +170,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
+    Default: us-west-1
     Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
@@ -206,6 +207,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   PrimaryRegionName:
+    Default: us-east-1
     Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   PrimaryVpcCidr:
@@ -218,7 +220,7 @@ Parameters:
       record currently defined in the corresponding Route 53 Hosted Zone.
     Type: String
   PublicHostedZoneId:
-    Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+    Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
     Type: String
 Resources:
   APIDeploymentStackSet:
@@ -324,7 +326,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -368,6 +370,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -406,6 +409,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -420,7 +424,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           BasePathMapping:
@@ -617,7 +621,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           ApiId:
@@ -668,6 +672,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -706,6 +711,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -720,7 +726,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           Api:
@@ -889,7 +895,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -933,6 +939,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -971,6 +978,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -985,7 +993,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           GetClusterInfo:
@@ -2037,7 +2045,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -2081,6 +2089,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -2119,6 +2128,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -2133,7 +2143,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           BypassRdsProxy:
@@ -3196,7 +3206,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -3240,6 +3250,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -3278,6 +3289,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -3292,7 +3304,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           GetClientErrors:
@@ -4456,7 +4468,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -4500,6 +4512,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -4538,6 +4551,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -4552,7 +4566,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           ClientEmulator:
@@ -5145,7 +5159,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           RegionalCfnExportRetrieverArn:
@@ -5202,6 +5216,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -5240,6 +5255,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -5254,7 +5270,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           CfnExportRetriever:
@@ -5676,7 +5692,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -5720,6 +5736,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -5758,6 +5775,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -5772,7 +5790,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           Bucket:
@@ -6126,7 +6144,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           GlobalAppDbClusterIdentifier:
@@ -6266,6 +6284,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -6304,6 +6323,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -6318,7 +6338,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           AppDbAdminSecret:
@@ -7219,7 +7239,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Parameters:
           CodeDownloadUrl:
@@ -7263,6 +7283,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -7301,6 +7322,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -7315,7 +7337,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           DatabaseCanary:
@@ -8452,7 +8474,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           DatabaseSubnetZoneAId:
@@ -8535,6 +8557,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -8573,6 +8596,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -8585,7 +8609,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           DatabaseAcl:
@@ -9261,7 +9285,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           GlobalAppDbClusterIdentifier:
@@ -9409,6 +9433,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -9447,6 +9472,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -9461,7 +9487,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           AppDatabasePreparerResource:
@@ -10827,7 +10853,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           PeeringConnectionIdExport:
@@ -10880,6 +10906,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -10920,6 +10947,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -10936,7 +10964,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           PeeringInvitation:
@@ -11130,7 +11158,7 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 23, 2023
+          LastUpdated: January 24, 2023
           Version: v1.05
         Outputs:
           WebLoadBalancerFqdn:
@@ -11181,6 +11209,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           FailoverRegionName:
+            Default: us-west-1
             Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           FailoverVpcCidr:
@@ -11219,6 +11248,7 @@ Resources:
             Description: The CIDR range you wish to use for your failover public subnet.
             Type: String
           PrimaryRegionName:
+            Default: us-east-1
             Description: The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
             Type: String
           PrimaryVpcCidr:
@@ -11233,7 +11263,7 @@ Resources:
               record currently defined in the corresponding Route 53 Hosted Zone.
             Type: String
           PublicHostedZoneId:
-            Description: The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.
+            Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
             Type: String
         Resources:
           Alb:

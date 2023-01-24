@@ -33,7 +33,7 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 23, 2023",
+  "LastUpdated": "January 24, 2023",
   "Version": "v1.05"
  },
  "Outputs": {
@@ -170,6 +170,7 @@
    "Type": "String"
   },
   "FailoverRegionName": {
+   "Default": "us-west-1",
    "Description": "The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.",
    "Type": "String"
   },
@@ -216,6 +217,7 @@
    "Type": "String"
   },
   "PrimaryRegionName": {
+   "Default": "us-east-1",
    "Description": "The name of the primary region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.",
    "Type": "String"
   },
@@ -229,7 +231,7 @@
    "Type": "String"
   },
   "PublicHostedZoneId": {
-   "Description": "The ID of the Route 53 Hosted Zone corresponding to the Service FQDN.",
+   "Description": "The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.",
    "Type": "String"
   }
  },
