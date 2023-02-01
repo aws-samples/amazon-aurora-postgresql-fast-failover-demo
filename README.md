@@ -18,7 +18,25 @@
 - The repository also contains a test application to produce load for the application and log successful calls and errors in a simple UI, and times the failover
 - In-region failover with and without RDS proxy
 
+## Pre-Requisites
+- A Public Hosted Zone registered with AWS Route53
+	- If you don't have one, please follow [these instructions](https://aws.amazon.com/getting-started/hands-on/get-a-domain/) to create a new one
+	- You can find the Public Hosted Zone ID in the AWS Console under Route53 -> Hosted Zones -> Hosted zone ID
+	- You can find the Public Service FQDN in the AWS Console under Route53 -> Hosted Zones -> Hosted zone name
+- A database username and password you'd like the demo to use for the Aurora Postgres databases it creates
+- The CIDR blocks for 2 VPCs and their subnets (you can created these easily using [this screen](https://us-east-1.console.aws.amazon.com/vpc/home?region=us-east-1#CreateVpc:createMode=vpcWithResources). You don't need NAT gateways or VPC endpoints to run this demo.)
+	- Each VPC should be in a different region (example: us-east-1 and us-east-2)
+	- Each of the 2 VPCs shouhd containin:
+		- 2 public subnets (for the Internet-facing API we'll be calling to test the region's applicaion)
+		- 2 private subnets (for the application's middle tier lambda)
+		- 2 more private subnets (for the database instances the middle tier will write to)
+	- Please note down the [CIDR ranges](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) (e.g. 10.10.0.0/21) of each of the above, as the CloudFormation template will need them.
+- A KMS KEY ARN for each region where you created a VPC for this demo
+	- To create one, go to KMS -> Create Key
+	- To find the ARN, go to KMS -> Customer managed keys -> click through your key ID -> copy the ARN
+
 ## Deploying This Solution
+- See pre-requisites section above, as you will be prompted for these by the next step
 - This solution can be deployed using a single **main** CloudFormation template [located here](cloudformation/). Both main.yml and main.json are functionally identical. This template takes roughly 60 minutes to deploy.
 - During deployment, this template will launch several additional multi-region CloudFormation StackSets to fully deploy the required resources. While you don't need to launch or modify these StackSets directly, the underlying templates have been included in this repo for your reference.
 - Once deployed, the primary stack you launch will contain the following outputs:
