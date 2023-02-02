@@ -23,7 +23,7 @@
 	- If you don't have one, please follow [these instructions](https://aws.amazon.com/getting-started/hands-on/get-a-domain/) to create a new one
 	- You can find the Public Hosted Zone ID in the AWS Console under Route53 -> Hosted Zones -> Hosted zone ID
 	- You can find the Public Service FQDN in the AWS Console under Route53 -> Hosted Zones -> Hosted zone name
-- Pick a database username and password you'd like the demo to use for the Aurora Postgres databases it creates
+- Pick a database username and password you'd like the demo to use for the Aurora Postgres databases it creates. Please be aware that the password must be longer than 8 characters, and the username can't be a Postgres keyword (like "admin")
 - Pick two AWS regions (example: us-east-1 and us-east-2) where you'll be testing
 - A KMS KEY ARN for each region where you created a VPC for this demo
 	- To create one, in your primary AWS region, go to KMS -> Create Key (ensure you're creating a Customer Managed Key by looking in the top left corner after clicking Create Key)
@@ -54,6 +54,28 @@
   - Create a custom AWS Lambda Layer for Python runtimes. This tooling takes, as input, the PyPI packages you want included in the layer, as well as any custom functions, then returns the resulting Layer Version ARN for use elsewhere in your template(s).
   - Execute DDL statements against a remote database in need of configuration. In the case of this solution, this tooling is used to initialize an RDS Aurora PostgreSQL database. However, using the custom Lambda Layer creation tooling mentioned above, it could be easily modified to target additional DB engines (e.g., MySQL, MariaDB).
   - Delete some or all DNS records within an Amazon Route53 Hosted Zone during a CloudFormation Stack deletion. By default, CloudFormation's AWS::Route53::RecordSet[Group] resource handlers will NOT delete DNS records if they have a value different than that which was used at their creation. If your application modifies DNS records created by CloudFormation, CloudFormation will not delete them in an effort to protect customers from inadvertently deleting records that are still needed. The mechanism included in this solution is indiscriminate when it comes to deletion. It takes, as input, the FQDN(s) you would like deleted from the specified Hosted Zone and deletes those records, regardless of their current values.
+
+## Running This Solution
+- Once the above CloudFormation stack has completed:
+- Test in-region failover using Amazon RDS Proxy:
+	- Navigate to https://dashboard.<your Public Service FQDN>/in-region-failover.html
+	- Use the control panel in the top-left corner to run the test:
+		- ![in-region control panel](control_in_region.png)
+		- 1: Bypass (or enable) RDS Proxy to see the difference in data loss with and without it
+		- 2: Click "Generate Client Traffic" to begin the test.
+		- Note the blue line whihc measures successful requests
+		- 3: Click "Send Failover Resuest" to shut down the active Aurora writer instance, causing an outage until the Aurora reader instance in the secondary availability zone restarts as a writer. 
+		- Note the red line that measures errors returned to the client and the outage duration with and without RDS Proxy
+		- 4: Reset the test environment before switching RDS Proxy on or off or re-running the test.
+- Test in-region failover using Amazon Aurora Global Database:
+	- Navigate to https://dashboard.<your Public Service FQDN>/in-region-failover.html
+		- ![cross-region control panel](control_cross_region.png)
+		- 1: Click "Generate Client Traffic" to begin the test.
+		- Note the blue line whihc measures successful requests
+		- 2: Click "Simulate LSE" to shut down all network connectivity to the primary region's Aurora databases causing an outage of the whole region's test applications in this VPC.
+		- Note the red line that measures errors returned to the client and the outage duration.
+		- Wait until the Canary Lambda notices the region is unhealthy, the Aurora reader instance in the secondary region restarts as a writer, and the Route53 CNAME is redirected to the secondary region.
+		- 3: Reset the test environment before re-running the test.
 
 ## Cleaning Up This Solution
 - To clean up / undeploy this solution, simply delete the primary CloudFormation Stack you initially launched. The cleanup will take roughly 45 minutes.
