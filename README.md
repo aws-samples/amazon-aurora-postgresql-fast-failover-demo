@@ -23,13 +23,16 @@
 	- If you don't have one, please follow [these instructions](https://aws.amazon.com/getting-started/hands-on/get-a-domain/) to create a new one
 	- You can find the Public Hosted Zone ID in the AWS Console under Route53 -> Hosted Zones -> Hosted zone ID
 	- You can find the Public Service FQDN in the AWS Console under Route53 -> Hosted Zones -> Hosted zone name
-- A database username and password you'd like the demo to use for the Aurora Postgres databases it creates
+- Pick a database username and password you'd like the demo to use for the Aurora Postgres databases it creates
+- Pick two AWS regions (example: us-east-1 and us-east-2) where you'll be testing
 - A KMS KEY ARN for each region where you created a VPC for this demo
-	- To create one, go to KMS -> Create Key
-	- To find the ARN, go to KMS -> Customer managed keys -> click through your key ID -> copy the ARN
-- The [CIDR blocks](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) (e.g. 10.10.0.0/21) for 2 VPCs and their subnets the solution will create
-	- Each VPC should be in a different region (example: us-east-1 and us-east-2)
-	- Each of the 2 VPCs the templace will create will containin:
+	- To create one, in your primary AWS region, go to KMS -> Create Key (ensure you're creating a Customer Managed Key by looking in the top left corner after clicking Create Key)
+	- Make sure to select Advanced Options -> Multi-Region Key
+	- Once the key is created, navigate into it, and click Regionality -> Create new replica keys, and select your secondary region
+	- To find the ARN, go to KMS -> Customer managed keys -> click through your key ID -> copy the ARN. Do this in each region (they'll look similar but have the region name as prefix that will change.
+- Optionally, you can specify the [CIDR blocks](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) (e.g. 10.10.0.0/21) for 2 VPCs and their subnets the solution will create
+	- The template creates one VPC in the primary region and one in the secondary region
+	- Each of the 2 VPCs the template will create will containin:
 		- 2 public subnets (for the Internet-facing API we'll be calling to test the region's applicaion)
 		- 2 private subnets (for the application's middle tier lambda)
 		- 2 more private subnets (for the database instances the middle tier will write to)
