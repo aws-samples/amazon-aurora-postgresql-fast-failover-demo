@@ -58,7 +58,9 @@
 ## Running This Solution
 - Once the above CloudFormation stack has completed:
 - Test in-region failover using Amazon RDS Proxy:
-	- Navigate to https://dashboard.<your Public Service FQDN>/in-region-failover.html
+	- Find the URLs of your test dashboard: Go to CloudFormation -> Stacks -> The stack you just created -> Outputs:
+		- CrossRegionFailoverDemoUrl: https://dashboard.<FQDN>/cross-region-failover.html?apiHost=api.<FQDN>&primaryRegion=<REGION1>&failoverRegion=<REGION2>
+		- InRegionFailoverDemoUrl: https://dashboard.<FQDN>/in-region-failover.html?apiHost=api.<FQDN>&primaryRegion=<REGION1>&failoverRegion=<REGION2>
 	- Use the control panel in the top-left corner to run the test:
 		- ![in-region control panel](control_in_region.png)
 		- 1: Bypass (or enable) RDS Proxy to see the difference in data loss with and without it
