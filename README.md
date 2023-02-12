@@ -23,13 +23,10 @@
 	- If you don't have one, please follow [these instructions](https://aws.amazon.com/getting-started/hands-on/get-a-domain/) to create a new one
 	- You can find the Public Hosted Zone ID in the AWS Console under Route53 -> Hosted Zones -> Hosted zone ID
 	- You can find the Public Service FQDN in the AWS Console under Route53 -> Hosted Zones -> Hosted zone name
+- Pick a unique-looking stack name (suggest all-caps with whole words describing what the stack does). These will become the prefix for all the resources the stack creates.
 - Pick a database username and password you'd like the demo to use for the Aurora Postgres databases it creates. Please be aware that the password must be longer than 8 characters, and the username can't be a Postgres keyword (like "admin")
 - Pick two AWS regions (example: us-east-1 and us-east-2) where you'll be testing
-- A KMS KEY ARN for each region where you created a VPC for this demo
-	- To create one, in your primary AWS region, go to KMS -> Create Key (ensure you're creating a Customer Managed Key by looking in the top left corner after clicking Create Key)
-	- Make sure to select Advanced Options -> Multi-Region Key
-	- Once the key is created, navigate into it, and click Regionality -> Create new replica keys, and select your secondary region
-	- To find the ARN, go to KMS -> Customer managed keys -> click through your key ID -> copy the ARN. Do this in each region (they'll look similar but have the region name as prefix that will change.
+- Ensure that your Lambda concurrency is increased to at least 1000 in both test regions. In the AWS Console, navigate to: Service Quotas -> AWS services -> AWS Lambda -> Concurrent executions and click Request quota increase, selecting 1000. Do this in each test region.
 - Optionally, you can specify the [CIDR blocks](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) (e.g. 10.10.0.0/21) for 2 VPCs and their subnets the solution will create
 	- The template creates one VPC in the primary region and one in the secondary region
 	- Each of the 2 VPCs the template will create will containin:
@@ -41,8 +38,8 @@
 - See pre-requisites section above, as you will be prompted for these by the next step
 - This solution can be deployed using a single **main** CloudFormation template [located here](cloudformation/). Both main.yml and main.json are functionally identical. This template takes roughly 60 minutes to deploy.
 - During deployment, this template will launch several additional multi-region CloudFormation StackSets to fully deploy the required resources. While you don't need to launch or modify these StackSets directly, the underlying templates have been included in this repo for your reference.
+- The "Primary-Databases" substack step waits for RDS databases to come up in the failover region, so it could take >20m
 - Once deployed, the primary stack you launch will contain the following outputs:
-
   - **InRegionFailoverDemoUrl** - The dashboard you can use to simulate an in-region failover.
   - **CrossRegionFailoverDemoUrl** - The dashboard you can use to simulate a cross-region failover.
 
@@ -81,6 +78,9 @@
 
 ## Cleaning Up This Solution
 - To clean up / undeploy this solution, simply delete the primary CloudFormation Stack you initially launched. The cleanup will take roughly 45 minutes.
+- If you see a delete failure, retry it, without skipping any failed deletions.
+- Sometimes ENIs take longer than expexted to delete, in which case you can delete them and the VPC manually, then retry the stack deletion.
+- After the stack deletion is complete, you need to delete the IAM roles used to do the deletion. Navigate to IAM -> Roles and find the roles that have your stack name as the prefix
 
 ## Security
 
