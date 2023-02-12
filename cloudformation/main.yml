@@ -26,7 +26,6 @@ Metadata:
           - PrimaryPrivateSubnetZoneBCidr
           - PrimaryDatabaseSubnetZoneACidr
           - PrimaryDatabaseSubnetZoneBCidr
-          - PrimaryKmsKeyArn
       - Label:
           default: Failover Region
         Parameters:
@@ -38,7 +37,6 @@ Metadata:
           - FailoverPrivateSubnetZoneBCidr
           - FailoverDatabaseSubnetZoneACidr
           - FailoverDatabaseSubnetZoneBCidr
-          - FailoverKmsKeyArn
     ParameterLabels:
       CodeDownloadUrl:
         default: Download URL
@@ -50,8 +48,6 @@ Metadata:
         default: Failover Region Database Subnet Zone A CIDR
       FailoverDatabaseSubnetZoneBCidr:
         default: Failover Region Database Subnet Zone B CIDR
-      FailoverKmsKeyArn:
-        default: Failover Region KMS Key ARN
       FailoverPrivateSubnetZoneACidr:
         default: Failover Region Private Subnet Zone A CIDR
       FailoverPrivateSubnetZoneBCidr:
@@ -68,8 +64,6 @@ Metadata:
         default: Primary Region Database Subnet Zone A CIDR
       PrimaryDatabaseSubnetZoneBCidr:
         default: Primary Region Database Subnet Zone B CIDR
-      PrimaryKmsKeyArn:
-        default: Primary Region KMS Key ARN
       PrimaryPrivateSubnetZoneACidr:
         default: Primary Region Private Subnet Zone A CIDR
       PrimaryPrivateSubnetZoneBCidr:
@@ -89,14 +83,14 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 24, 2023
-  Version: v1.05
+  LastUpdated: February 10, 2023
+  Version: v1.07
 Outputs:
   CrossRegionFailoverDemoUrl:
     Value: !Join
       - ''
-      - - https://dashboard.
-        - !Ref 'PublicFqdn'
+      - - https://
+        - !GetAtt 'FinalExportRetriever.CustomCloudFrontDashboardEndpoint'
         - /cross-region-failover.html
         - !Join
           - ''
@@ -104,8 +98,8 @@ Outputs:
               - ''
               - - !Join
                   - ''
-                  - - ?apiHost=api.
-                    - !Ref 'PublicFqdn'
+                  - - ?apiHost=
+                    - !GetAtt 'FinalExportRetriever.CustomApiEndpoint'
                 - '&primaryRegion='
                 - !Ref 'PrimaryRegionName'
             - '&failoverRegion='
@@ -113,8 +107,8 @@ Outputs:
   InRegionFailoverDemoUrl:
     Value: !Join
       - ''
-      - - https://dashboard.
-        - !Ref 'PublicFqdn'
+      - - https://
+        - !GetAtt 'FinalExportRetriever.CustomCloudFrontDashboardEndpoint'
         - /in-region-failover.html
         - !Join
           - ''
@@ -122,8 +116,8 @@ Outputs:
               - ''
               - - !Join
                   - ''
-                  - - ?apiHost=api.
-                    - !Ref 'PublicFqdn'
+                  - - ?apiHost=
+                    - !GetAtt 'FinalExportRetriever.CustomApiEndpoint'
                 - '&primaryRegion='
                 - !Ref 'PrimaryRegionName'
             - '&failoverRegion='
@@ -147,11 +141,6 @@ Parameters:
   FailoverDatabaseSubnetZoneBCidr:
     Default: 10.10.13.0/24
     Description: The CIDR range you wish to use for your failover database subnet.
-    Type: String
-  FailoverKmsKeyArn:
-    Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -184,11 +173,6 @@ Parameters:
   PrimaryDatabaseSubnetZoneBCidr:
     Default: 10.10.5.0/24
     Description: The CIDR range you wish to use for your failover database subnet.
-    Type: String
-  PrimaryKmsKeyArn:
-    Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -271,8 +255,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -289,8 +271,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -326,8 +306,43 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
+        Outputs:
+          ApiHostExport:
+            Export:
+              Name: !Join
+                - ''
+                - - !Ref 'MainStackName'
+                  - -ApiHost
+            Value: !Join
+              - ''
+              - - !Join
+                  - ''
+                  - - '{{resolve:ssm:/'
+                    - !Ref 'MainStackName'
+                    - /ApiId}}
+                - .execute-api.
+                - !Ref 'AWS::Region'
+                - .amazonaws.com/
+                - v1
+          CustomApiEndpointExport:
+            Export:
+              Name: !Join
+                - ''
+                - - !Ref 'MainStackName'
+                  - -CustomApiEndpoint
+            Value: !Join
+              - ''
+              - - api.
+                - !Ref 'PublicFqdn'
+          DefaultApiEndpointExport:
+            Export:
+              Name: !Join
+                - ''
+                - - !Ref 'MainStackName'
+                  - -DefaultApiEndpoint
+            Value: !GetAtt 'DomainName.RegionalDomainName'
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -347,11 +362,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -386,11 +396,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -566,8 +571,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -584,8 +587,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -621,8 +622,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           ApiId:
             Condition: ''
@@ -649,11 +650,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -688,11 +684,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -840,8 +831,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -858,8 +847,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -895,8 +882,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -916,11 +903,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -955,11 +937,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -1595,10 +1572,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -1910,10 +1888,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -1990,8 +1969,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -2008,8 +1985,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -2045,8 +2020,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -2066,11 +2041,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -2105,11 +2075,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -2454,10 +2419,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
                 - PolicyDocument:
@@ -2773,10 +2739,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -3086,10 +3053,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
                 - PolicyDocument:
@@ -3151,8 +3119,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -3169,8 +3135,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -3206,8 +3170,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -3227,11 +3191,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -3266,11 +3225,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -3610,10 +3564,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -3923,10 +3878,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -4300,10 +4256,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
                 - PolicyDocument:
@@ -4413,8 +4370,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -4431,8 +4386,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -4468,8 +4421,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -4489,11 +4442,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -4528,11 +4476,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -4686,10 +4629,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -5103,8 +5047,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -5121,8 +5063,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -5159,8 +5099,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           RegionalCfnExportRetrieverArn:
             Condition: ''
@@ -5193,11 +5133,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -5232,11 +5167,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -5348,15 +5278,15 @@ Resources:
                   \ context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::', '')\n\
                   \    \n    response_data = {}\n    \n    route53_client = boto3.client('route53')\n    \n    if event['RequestType'] in ['Delete']:\n        \n        try:\n            \n            record_sets_resp\
                   \ = route53_client.list_resource_record_sets(\n                HostedZoneId = arguments['HostedZoneId'],\n            )\n            \n            change_batch = []\n            \n           \
-                  \ for record_set in record_sets_resp['ResourceRecordSets']:\n                \n                '''\n                    We'll be leaving NS and SOA records.\n                '''\n            \
-                  \    if record_set['Type'] in ['NS', 'SOA']:\n                    continue\n                \n                '''\n                    If we've been instructed to delete all FQDNs or this FQDN\n\
-                  \                    \n                    We're going to use for comparison the raw record name from Route53\n                    as well as the name minus the trailing period.\n            \
-                  \    '''\n                if '*' in arguments['Fqdns'] or (record_set['Name'] in arguments['Fqdns'] or record_set['Name'][0:-1] in arguments['Fqdns']):\n                    \n                \
-                  \    change_batch.append({\n                        'Action': 'DELETE',\n                        'ResourceRecordSet': record_set,\n                    })\n            \n            if len(change_batch)\
-                  \ > 0:\n                \n                route53_client.change_resource_record_sets(\n                    HostedZoneId = arguments['HostedZoneId'],\n                    ChangeBatch = {\n    \
-                  \                    'Changes': change_batch\n                    }\n                )\n                \n        except ClientError as e:\n            \n            print('Failed to Delete DNS\
-                  \ Records: ' + str(e.response))\n            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n            \n    return cfnresponse.send(event, context, cfnresponse.SUCCESS,\
-                  \ response_data)"
+                  \ for record_set in record_sets_resp['ResourceRecordSets']:\n                \n                print(record_set)\n                \n                '''\n                    We'll be leaving NS\
+                  \ and SOA records.\n                '''\n                if record_set['Type'] in ['NS', 'SOA']:\n                    print('Not An Eligible Record Type - Skipping')\n                    continue\n\
+                  \                \n                '''\n                    If we've been instructed to delete all FQDNs or this FQDN\n                    \n                    We're going to use for comparison\
+                  \ the raw record name from Route53\n                    as well as the name minus the trailing period.\n                '''\n                if '*' in arguments['Fqdns'] or (record_set['Name']\
+                  \ in arguments['Fqdns'] or record_set['Name'][0:-1] in arguments['Fqdns']):\n                    \n                    print('Deleting Record')\n                    \n                    change_batch.append({\n\
+                  \                        'Action': 'DELETE',\n                        'ResourceRecordSet': record_set,\n                    })\n            \n            if len(change_batch) > 0:\n          \
+                  \      \n                route53_client.change_resource_record_sets(\n                    HostedZoneId = arguments['HostedZoneId'],\n                    ChangeBatch = {\n                     \
+                  \   'Changes': change_batch\n                    }\n                )\n                \n        except ClientError as e:\n            \n            print('Failed to Delete DNS Records: ' + str(e.response))\n\
+                  \            return cfnresponse.send(event, context, cfnresponse.FAILED, response_data)\n            \n    return cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)"
               Description: Deletes DNS Records on Stack Cleanup
               Handler: index.handler
               Layers: []
@@ -5429,10 +5359,10 @@ Resources:
                   \tif A[J]in['Delete']:\n\t\ttry:\n\t\t\tL=E.list_layer_versions(LayerName=B[G])\n\t\t\tfor M in L['LayerVersions']:H=E.delete_layer_version(LayerName=B[G],VersionNumber=M['Version'])\n\t\texcept\
                   \ boto3_client_error as F:print('Failed to Delete Layer Versions: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\t\treturn cfnresponse.send(A,C,cfnresponse.SUCCESS,D)\n\
                   import dateutil.tz\nfrom datetime import datetime\nfrom datetime import timedelta\nclass Functions:\n\tdef __init__(A):''\n\tdef add_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=5)).strftime(_A)\n\
-                  \tdef subtract_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=-5)).strftime(_A)\n\tdef add_time(C,label,data):\n\t\tA=label;D=dateutil.tz.gettz('US/Pacific');B=datetime.now(tz=D);print(datetime.strptime(A[len(A)-1],_A)+timedelta(seconds=9));print(datetime.strptime(B.strftime(_A),_A))\n\
-                  \t\twhile datetime.strptime(A[len(A)-1],_A)+timedelta(seconds=9)<datetime.strptime(B.strftime(_A),_A):print('add');A.pop(0);data.pop(0);A.append(C.add_five_seconds(A[len(A)-1]));data.append('0')\n\
-                  \t'\\n        Requires \"REGIONAL_(APP|DEMO)_DB_SECRET_ARN\" as an environment variable\\n        \\n        - db_identifier | str (App|Demo)\\n    '\n\tdef get_db_credentials(E,db_identifier):\n\
-                  \t\tA=db_identifier;B=boto3.client('secretsmanager')\n\t\ttry:C=B.get_secret_value(SecretId=os.environ['REGIONAL_'+A.upper()+'_DB_SECRET_ARN'])\n\t\texcept boto3_client_error as D:raise Exception('Failed\
+                  \tdef subtract_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=-5)).strftime(_A)\n\tdef add_time(B,label,data):\n\t\tA=label;C=dateutil.tz.gettz('US/Pacific');D=datetime.now(tz=C)\n\
+                  \t\twhile datetime.strptime(A[len(A)-1],_A)+timedelta(seconds=9)<datetime.strptime(D.strftime(_A),_A):A.pop(0);data.pop(0);A.append(B.add_five_seconds(A[len(A)-1]));data.append('0')\n\t'\\n  \
+                  \      Requires \"REGIONAL_(APP|DEMO)_DB_SECRET_ARN\" as an environment variable\\n        \\n        - db_identifier | str (App|Demo)\\n    '\n\tdef get_db_credentials(E,db_identifier):\n\t\t\
+                  A=db_identifier;B=boto3.client('secretsmanager')\n\t\ttry:C=B.get_secret_value(SecretId=os.environ['REGIONAL_'+A.upper()+'_DB_SECRET_ARN'])\n\t\texcept boto3_client_error as D:raise Exception('Failed\
                   \ to Retrieve '+A+' Database Secret: '+str(D))\n\t\telse:return json.loads(C['SecretString'])\n\t'\\n        fqdn | str\\n        newValue | str\\n        hostedZoneId | str\\n        [ ttl |\
                   \ int ]\\n        [ type | str ]\\n    '\n\tdef update_dns_record(C,fqdn,new_value,hosted_zone_id,ttl=1,record_type='CNAME'):\n\t\tA=boto3.client('route53')\n\t\ttry:A.change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':fqdn,'ResourceRecords':[{'Value':new_value}],'TTL':ttl,'Type':record_type}}]},HostedZoneId=hosted_zone_id)\n\
                   \t\texcept boto3_client_error as B:raise Exception('Failed to Update DNS Record: '+str(B))\n\t\treturn True"
@@ -5637,8 +5567,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -5655,8 +5583,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -5692,8 +5618,26 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
+        Outputs:
+          CustomCloudFrontCdnFqdnExport:
+            Export:
+              Name: !Join
+                - ''
+                - - !Ref 'MainStackName'
+                  - -CustomCloudFrontDashboardEndpoint
+            Value: !Join
+              - .
+              - - dashboard
+                - !Ref 'PublicFqdn'
+          DefaultCloudFrontCdnFqdnExport:
+            Export:
+              Name: !Join
+                - ''
+                - - !Ref 'MainStackName'
+                  - -DefaultCloudFrontDashboardEndpoint
+            Value: !GetAtt 'CloudFrontDistribution.DomainName'
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -5713,11 +5657,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -5752,11 +5691,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -5914,24 +5848,6 @@ Resources:
               Timeout: 30
               TracingConfig:
                 Mode: PassThrough
-              VpcConfig:
-                SecurityGroupIds:
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /LambdaSecurityGroupId}}
-                SubnetIds:
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /PrivateSubnetZoneAId}}
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /PrivateSubnetZoneBId}}
             Type: AWS::Lambda::Function
           DashboardCodeDeployerLogGroup:
             DeletionPolicy: Delete
@@ -5970,7 +5886,6 @@ Resources:
                         - lambda.amazonaws.com
               ManagedPolicyArns:
                 - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-                - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
               MaxSessionDuration: 3600
               Policies:
                 - PolicyDocument:
@@ -6089,8 +6004,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -6107,8 +6020,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -6144,8 +6055,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           GlobalAppDbClusterIdentifier:
             Condition: ''
@@ -6242,6 +6153,17 @@ Resources:
                   - !Split
                     - ':'
                     - !GetAtt 'PrimaryRegionDbExportRetriever.DemoDbAdminSecretArn'
+          RegionalKmsKeyArn:
+            Condition: ''
+            Export:
+              Name: !Join
+                - '-'
+                - - !Ref 'MainStackName'
+                  - RegionalKmsKeyArn
+            Value: !If
+              - IsPrimaryRegion
+              - !GetAtt 'KMSKey.Arn'
+              - !GetAtt 'KMSKeyReplica.Arn'
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -6261,11 +6183,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -6300,11 +6217,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -6347,10 +6259,6 @@ Resources:
                 - ''
                 - - 'Failover App DB Cluster Admin Account for '
                   - !Ref 'MainStackName'
-              KmsKeyId: !If
-                - IsPrimaryRegion
-                - !Ref 'PrimaryKmsKeyArn'
-                - !Ref 'FailoverKmsKeyArn'
               SecretString: !Join
                 - ''
                 - - '{"username": "'
@@ -6673,8 +6581,8 @@ Resources:
               GlobalClusterIdentifier: !GetAtt 'PrimaryRegionDbExportRetriever.GlobalAppDbClusterIdentifier'
               KmsKeyId: !If
                 - IsPrimaryRegion
-                - !Ref 'PrimaryKmsKeyArn'
-                - !Ref 'FailoverKmsKeyArn'
+                - !Ref 'KMSKey'
+                - !Ref 'KMSKeyReplica'
               Port: 5432
               RestoreType: copy-on-write
               StorageEncrypted: true
@@ -6831,6 +6739,66 @@ Resources:
                   - !Ref 'PublicFqdn'
                   - .internal
             Type: AWS::SSM::Parameter
+          KMSKey:
+            Condition: IsPrimaryRegion
+            Properties:
+              Description: !Join
+                - ''
+                - - 'Muli-Region KMS Key for '
+                  - !Ref 'AWS::StackName'
+              EnableKeyRotation: true
+              Enabled: true
+              KeyPolicy:
+                Id: default-key-policy
+                Statement:
+                  - Action: kms:*
+                    Effect: Allow
+                    Principal:
+                      AWS: !Join
+                        - ''
+                        - - 'arn:aws:iam::'
+                          - !Ref 'AWS::AccountId'
+                          - :root
+                    Resource: '*'
+                    Sid: Enable IAM User Permissions
+                Version: '2012-10-17'
+              MultiRegion: true
+            Type: AWS::KMS::Key
+          KMSKeyReplica:
+            Condition: IsFailoverRegion
+            Properties:
+              Enabled: true
+              KeyPolicy:
+                Id: default-key-policy
+                Statement:
+                  - Action: kms:*
+                    Effect: Allow
+                    Principal:
+                      AWS: !Join
+                        - ''
+                        - - 'arn:aws:iam::'
+                          - !Ref 'AWS::AccountId'
+                          - :root
+                    Resource: '*'
+                    Sid: Enable IAM User Permissions
+                Version: '2012-10-17'
+              PrimaryKeyArn: !GetAtt 'PrimaryRegionCmkRetriever.RegionalKmsKeyArn'
+            Type: AWS::KMS::ReplicaKey
+          PrimaryRegionCmkRetriever:
+            Condition: IsFailoverRegion
+            Properties:
+              Properties:
+                ExportPrefix: !Ref 'MainStackName'
+                Region: !Ref 'PrimaryRegionName'
+                Version: 1.05
+              ServiceToken: !Join
+                - ''
+                - - '{{resolve:ssm:/'
+                  - !Ref 'MainStackName'
+                  - /RegionalCfnExportRetrieverArn}}
+              Type: Custom::GetCFNExports
+              Version: '1.0'
+            Type: AWS::CloudFormation::CustomResource
           PrimaryRegionDbExportRetriever:
             Properties:
               Properties:
@@ -7135,6 +7103,27 @@ Resources:
                       - ':'
                       - !GetAtt 'PrimaryRegionDbExportRetriever.DemoDbAdminSecretArn'
             Type: AWS::SSM::Parameter
+          RegionalKmsKeyArnParam:
+            Condition: ''
+            Properties:
+              Description: !Join
+                - ''
+                - - 'Regional KMS Key ARN for '
+                  - !Ref 'AWS::StackName'
+                  - ' stack'
+              Name: !Join
+                - ''
+                - - /
+                  - !Ref 'MainStackName'
+                  - /
+                  - RegionalKmsKeyArn
+              Tier: Standard
+              Type: String
+              Value: !If
+                - IsPrimaryRegion
+                - !GetAtt 'KMSKey.Arn'
+                - !GetAtt 'KMSKeyReplica.Arn'
+            Type: AWS::SSM::Parameter
         Transform:
           Name: AWS::SecretsManager-2020-07-23
     Type: AWS::CloudFormation::StackSet
@@ -7183,8 +7172,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -7201,8 +7188,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -7239,8 +7224,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -7260,11 +7245,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -7299,11 +7279,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -7511,10 +7486,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                       - Action:
                           - rds:DescribeGlobalClusters
@@ -7773,10 +7749,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: main-policy
                 - PolicyDocument:
@@ -8041,10 +8018,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: main-policy
                 - PolicyDocument:
@@ -8293,10 +8271,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
                 - PolicyDocument:
@@ -8381,6 +8360,20 @@ Resources:
       Type: Custom::GetCFNExports
       Version: '1.0'
     Type: AWS::CloudFormation::CustomResource
+  FinalExportRetriever:
+    DependsOn:
+      - DashboardStackSet
+      - APIDeploymentStackSet
+      - CfnExportRetrieverLogGroup
+    Properties:
+      Properties:
+        ExportPrefix: !Ref 'AWS::StackName'
+        Region: !Ref 'PrimaryRegionName'
+        Version: 1.1
+      ServiceToken: !GetAtt 'CfnExportRetriever.Arn'
+      Type: Custom::GetCFNExports
+      Version: '1.0'
+    Type: AWS::CloudFormation::CustomResource
   NetworkingStackSet:
     DependsOn:
       - StackSetExecutionRole
@@ -8420,8 +8413,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -8438,8 +8429,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -8474,8 +8463,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           DatabaseSubnetZoneAId:
             Condition: ''
@@ -8535,11 +8524,6 @@ Resources:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
             Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
-            Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
             Description: The CIDR range you wish to use for your primary private subnet.
@@ -8573,11 +8557,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -9230,8 +9209,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -9248,8 +9225,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -9285,8 +9260,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           GlobalAppDbClusterIdentifier:
             Condition: ''
@@ -9391,6 +9366,17 @@ Resources:
           RegionalDemoDbClusterWriterEndpoint:
             Condition: ''
             Value: !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
+          RegionalKmsKeyArn:
+            Condition: ''
+            Export:
+              Name: !Join
+                - '-'
+                - - !Ref 'MainStackName'
+                  - RegionalKmsKeyArn
+            Value: !If
+              - IsPrimaryRegion
+              - !GetAtt 'KMSKey.Arn'
+              - !GetAtt 'KMSKeyReplica.Arn'
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -9410,11 +9396,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -9449,11 +9430,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -9515,10 +9491,6 @@ Resources:
                 - ''
                 - - 'Primary App DB Cluster Admin Account for '
                   - !Ref 'MainStackName'
-              KmsKeyId: !If
-                - IsPrimaryRegion
-                - !Ref 'PrimaryKmsKeyArn'
-                - !Ref 'FailoverKmsKeyArn'
               SecretString: !Join
                 - ''
                 - - '{"username": "'
@@ -9532,36 +9504,7 @@ Resources:
             Properties:
               Properties:
                 Fqdns:
-                  - !Join
-                    - .
-                    - - app
-                      - db
-                      - reader
-                      - !Ref 'PublicFqdn'
-                      - internal
-                  - !Join
-                    - .
-                    - - app
-                      - db
-                      - cluster
-                      - reader
-                      - !Ref 'PublicFqdn'
-                      - internal
-                  - !Join
-                    - .
-                    - - app
-                      - db
-                      - writer
-                      - !Ref 'PublicFqdn'
-                      - internal
-                  - !Join
-                    - .
-                    - - app
-                      - db
-                      - cluster
-                      - writer
-                      - !Ref 'PublicFqdn'
-                      - internal
+                  - '*'
                 HostedZoneId: !Ref 'PrivateHostedZoneId'
               ServiceToken: !Join
                 - ''
@@ -9835,8 +9778,8 @@ Resources:
                         Resource:
                           - !If
                             - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                            - !GetAtt 'KMSKey.Arn'
+                            - !GetAtt 'KMSKeyReplica.Arn'
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
@@ -9997,13 +9940,8 @@ Resources:
                 - ''
                 - - 'Primary Demo DB Cluster Admin Account for '
                   - !Ref 'MainStackName'
-              KmsKeyId: !If
-                - IsPrimaryRegion
-                - !Ref 'PrimaryKmsKeyArn'
-                - !Ref 'FailoverKmsKeyArn'
               ReplicaRegions:
-                - KmsKeyId: !Ref 'FailoverKmsKeyArn'
-                  Region: !Ref 'FailoverRegionName'
+                - Region: !Ref 'FailoverRegionName'
               SecretString: !Join
                 - ''
                 - - '{"username": "'
@@ -10017,36 +9955,7 @@ Resources:
             Properties:
               Properties:
                 Fqdns:
-                  - !Join
-                    - .
-                    - - demo
-                      - db
-                      - reader
-                      - !Ref 'PublicFqdn'
-                      - internal
-                  - !Join
-                    - .
-                    - - demo
-                      - db
-                      - cluster
-                      - reader
-                      - !Ref 'PublicFqdn'
-                      - internal
-                  - !Join
-                    - .
-                    - - demo
-                      - db
-                      - writer
-                      - !Ref 'PublicFqdn'
-                      - internal
-                  - !Join
-                    - .
-                    - - demo
-                      - db
-                      - cluster
-                      - writer
-                      - !Ref 'PublicFqdn'
-                      - internal
+                  - '*'
                 HostedZoneId: !Ref 'PrivateHostedZoneId'
               ServiceToken: !Join
                 - ''
@@ -10298,6 +10207,51 @@ Resources:
                   - !Ref 'PublicFqdn'
                   - .internal
             Type: AWS::SSM::Parameter
+          KMSKey:
+            Condition: IsPrimaryRegion
+            Properties:
+              Description: !Join
+                - ''
+                - - 'Muli-Region KMS Key for '
+                  - !Ref 'AWS::StackName'
+              EnableKeyRotation: true
+              Enabled: true
+              KeyPolicy:
+                Id: default-key-policy
+                Statement:
+                  - Action: kms:*
+                    Effect: Allow
+                    Principal:
+                      AWS: !Join
+                        - ''
+                        - - 'arn:aws:iam::'
+                          - !Ref 'AWS::AccountId'
+                          - :root
+                    Resource: '*'
+                    Sid: Enable IAM User Permissions
+                Version: '2012-10-17'
+              MultiRegion: true
+            Type: AWS::KMS::Key
+          KMSKeyReplica:
+            Condition: IsFailoverRegion
+            Properties:
+              Enabled: true
+              KeyPolicy:
+                Id: default-key-policy
+                Statement:
+                  - Action: kms:*
+                    Effect: Allow
+                    Principal:
+                      AWS: !Join
+                        - ''
+                        - - 'arn:aws:iam::'
+                          - !Ref 'AWS::AccountId'
+                          - :root
+                    Resource: '*'
+                    Sid: Enable IAM User Permissions
+                Version: '2012-10-17'
+              PrimaryKeyArn: !GetAtt 'PrimaryRegionCmkRetriever.RegionalKmsKeyArn'
+            Type: AWS::KMS::ReplicaKey
           PrimaryAppCluster:
             Condition: IsPrimaryRegion
             DeletionPolicy: Delete
@@ -10313,8 +10267,8 @@ Resources:
               EngineVersion: '13.7'
               KmsKeyId: !If
                 - IsPrimaryRegion
-                - !Ref 'PrimaryKmsKeyArn'
-                - !Ref 'FailoverKmsKeyArn'
+                - !Ref 'KMSKey'
+                - !Ref 'KMSKeyReplica'
               MasterUserPassword: !Ref 'DatabaseAdminPassword'
               MasterUsername: !Ref 'DatabaseAdminUsername'
               Port: 5432
@@ -10371,8 +10325,8 @@ Resources:
               EngineVersion: '13.7'
               KmsKeyId: !If
                 - IsPrimaryRegion
-                - !Ref 'PrimaryKmsKeyArn'
-                - !Ref 'FailoverKmsKeyArn'
+                - !Ref 'KMSKey'
+                - !Ref 'KMSKeyReplica'
               MasterUserPassword: !Ref 'DatabaseAdminPassword'
               MasterUsername: !Ref 'DatabaseAdminUsername'
               Port: 5432
@@ -10414,6 +10368,21 @@ Resources:
               Engine: aurora-postgresql
               MultiAZ: false
             Type: AWS::RDS::DBInstance
+          PrimaryRegionCmkRetriever:
+            Condition: IsFailoverRegion
+            Properties:
+              Properties:
+                ExportPrefix: !Ref 'MainStackName'
+                Region: !Ref 'PrimaryRegionName'
+                Version: 1.05
+              ServiceToken: !Join
+                - ''
+                - - '{{resolve:ssm:/'
+                  - !Ref 'MainStackName'
+                  - /RegionalCfnExportRetrieverArn}}
+              Type: Custom::GetCFNExports
+              Version: '1.0'
+            Type: AWS::CloudFormation::CustomResource
           RegionalAppDbAdminSecretArnParam:
             Condition: ''
             Properties:
@@ -10684,6 +10653,27 @@ Resources:
               Type: String
               Value: !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
             Type: AWS::SSM::Parameter
+          RegionalKmsKeyArnParam:
+            Condition: ''
+            Properties:
+              Description: !Join
+                - ''
+                - - 'Regional KMS Key ARN for '
+                  - !Ref 'AWS::StackName'
+                  - ' stack'
+              Name: !Join
+                - ''
+                - - /
+                  - !Ref 'MainStackName'
+                  - /
+                  - RegionalKmsKeyArn
+              Tier: Standard
+              Type: String
+              Value: !If
+                - IsPrimaryRegion
+                - !GetAtt 'KMSKey.Arn'
+                - !GetAtt 'KMSKeyReplica.Arn'
+            Type: AWS::SSM::Parameter
         Transform:
           Name: AWS::SecretsManager-2020-07-23
     Type: AWS::CloudFormation::StackSet
@@ -10717,6 +10707,7 @@ Resources:
           VPCRegion: !Ref 'FailoverRegionName'
     Type: AWS::Route53::HostedZone
   StackSetAdministrationRole:
+    DeletionPolicy: Retain
     DependsOn:
       - StackSetExecutionRole
     Properties:
@@ -10739,6 +10730,7 @@ Resources:
           PolicyName: main-policy
     Type: AWS::IAM::Role
   StackSetExecutionRole:
+    DeletionPolicy: Retain
     Properties:
       AssumeRolePolicyDocument:
         Statement:
@@ -10793,8 +10785,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -10811,8 +10801,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -10853,8 +10841,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           PeeringConnectionIdExport:
             Condition: IsPrimaryRegion
@@ -10883,11 +10871,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -10924,11 +10907,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -11102,8 +11080,6 @@ Resources:
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneACidr'
         - ParameterKey: PrimaryDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'PrimaryDatabaseSubnetZoneBCidr'
-        - ParameterKey: PrimaryKmsKeyArn
-          ParameterValue: !Ref 'PrimaryKmsKeyArn'
         - ParameterKey: FailoverRegionName
           ParameterValue: !Ref 'FailoverRegionName'
         - ParameterKey: FailoverVpcCidr
@@ -11120,8 +11096,6 @@ Resources:
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneACidr'
         - ParameterKey: FailoverDatabaseSubnetZoneBCidr
           ParameterValue: !Ref 'FailoverDatabaseSubnetZoneBCidr'
-        - ParameterKey: FailoverKmsKeyArn
-          ParameterValue: !Ref 'FailoverKmsKeyArn'
         - ParameterKey: PublicFqdn
           ParameterValue: !Ref 'PublicFqdn'
         - ParameterKey: PublicHostedZoneId
@@ -11158,8 +11132,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: January 24, 2023
-          Version: v1.05
+          LastUpdated: February 10, 2023
+          Version: v1.07
         Outputs:
           WebLoadBalancerFqdn:
             Condition: ''
@@ -11186,11 +11160,6 @@ Resources:
           FailoverDatabaseSubnetZoneBCidr:
             Default: 10.10.13.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          FailoverKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           FailoverPrivateSubnetZoneACidr:
             Default: 10.10.9.0/24
@@ -11225,11 +11194,6 @@ Resources:
           PrimaryDatabaseSubnetZoneBCidr:
             Default: 10.10.5.0/24
             Description: The CIDR range you wish to use for your failover database subnet.
-            Type: String
-          PrimaryKmsKeyArn:
-            Description: >-
-              The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-              information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
             Type: String
           PrimaryPrivateSubnetZoneACidr:
             Default: 10.10.1.0/24
@@ -11522,10 +11486,11 @@ Resources:
                           - kms:Decrypt
                         Effect: Allow
                         Resource:
-                          - !If
-                            - IsPrimaryRegion
-                            - !Ref 'PrimaryKmsKeyArn'
-                            - !Ref 'FailoverKmsKeyArn'
+                          - !Join
+                            - ''
+                            - - '{{resolve:ssm:/'
+                              - !Ref 'MainStackName'
+                              - /RegionalKmsKeyArn}}
                         Sid: DecryptWithKMS
                   PolicyName: database-secret-retrieval
             Type: AWS::IAM::Role
