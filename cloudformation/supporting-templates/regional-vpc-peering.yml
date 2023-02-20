@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: February 19, 2023
-  Version: v1.08
+  LastUpdated: February 20, 2023
+  Version: v1.09
 Outputs:
   PeeringConnectionIdExport:
     Condition: IsPrimaryRegion
@@ -61,7 +61,7 @@ Parameters:
     Description: The CIDR range you wish to use for your failover public subnet.
     Type: String
   FailoverRegionName:
-    Default: us-west-1
+    Default: us-east-2
     Description: The name of the failover region (e.g., us-east-1). You may choose any AWS Region that supports the required services. The primary and failover regions must be different.
     Type: String
   FailoverVpcCidr:
