@@ -36,10 +36,13 @@ def handler(event, context):
             
             for record_set in record_sets_resp['ResourceRecordSets']:
                 
+                print(record_set)
+                
                 '''
                     We'll be leaving NS and SOA records.
                 '''
                 if record_set['Type'] in ['NS', 'SOA']:
+                    print('Not An Eligible Record Type - Skipping')
                     continue
                 
                 '''
@@ -49,6 +52,8 @@ def handler(event, context):
                     as well as the name minus the trailing period.
                 '''
                 if '*' in arguments['Fqdns'] or (record_set['Name'] in arguments['Fqdns'] or record_set['Name'][0:-1] in arguments['Fqdns']):
+                    
+                    print('Deleting Record')
                     
                     change_batch.append({
                         'Action': 'DELETE',
