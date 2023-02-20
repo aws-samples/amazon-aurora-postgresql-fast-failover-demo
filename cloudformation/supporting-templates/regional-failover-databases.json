@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 24, 2023",
-  "Version": "v1.05"
+  "LastUpdated": "February 19, 2023",
+  "Version": "v1.08"
  },
  "Outputs": {
   "GlobalAppDbClusterIdentifier": {
@@ -267,6 +267,39 @@
      ]
     ]
    }
+  },
+  "RegionalKmsKeyArn": {
+   "Condition": "",
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "RegionalKmsKeyArn"
+      ]
+     ]
+    }
+   },
+   "Value": {
+    "Fn::If": [
+     "IsPrimaryRegion",
+     {
+      "Fn::GetAtt": [
+       "KMSKey",
+       "Arn"
+      ]
+     },
+     {
+      "Fn::GetAtt": [
+       "KMSKeyReplica",
+       "Arn"
+      ]
+     }
+    ]
+   }
   }
  },
  "Parameters": {
@@ -292,10 +325,6 @@
   "FailoverDatabaseSubnetZoneBCidr": {
    "Default": "10.10.13.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "FailoverKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "FailoverPrivateSubnetZoneACidr": {
@@ -339,10 +368,6 @@
   "PrimaryDatabaseSubnetZoneBCidr": {
    "Default": "10.10.5.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "PrimaryKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "PrimaryPrivateSubnetZoneACidr": {
@@ -399,17 +424,6 @@
         "Ref": "MainStackName"
        }
       ]
-     ]
-    },
-    "KmsKeyId": {
-     "Fn::If": [
-      "IsPrimaryRegion",
-      {
-       "Ref": "PrimaryKmsKeyArn"
-      },
-      {
-       "Ref": "FailoverKmsKeyArn"
-      }
      ]
     },
     "SecretString": {
@@ -1098,10 +1112,10 @@
      "Fn::If": [
       "IsPrimaryRegion",
       {
-       "Ref": "PrimaryKmsKeyArn"
+       "Ref": "KMSKey"
       },
       {
-       "Ref": "FailoverKmsKeyArn"
+       "Ref": "KMSKeyReplica"
       }
      ]
     },
@@ -1395,6 +1409,120 @@
     }
    },
    "Type": "AWS::SSM::Parameter"
+  },
+  "KMSKey": {
+   "Condition": "IsPrimaryRegion",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Muli-Region KMS Key for ",
+       {
+        "Ref": "AWS::StackName"
+       }
+      ]
+     ]
+    },
+    "EnableKeyRotation": true,
+    "Enabled": true,
+    "KeyPolicy": {
+     "Id": "default-key-policy",
+     "Statement": [
+      {
+       "Action": "kms:*",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:aws:iam::",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":root"
+          ]
+         ]
+        }
+       },
+       "Resource": "*",
+       "Sid": "Enable IAM User Permissions"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "MultiRegion": true
+   },
+   "Type": "AWS::KMS::Key"
+  },
+  "KMSKeyReplica": {
+   "Condition": "IsFailoverRegion",
+   "Properties": {
+    "Enabled": true,
+    "KeyPolicy": {
+     "Id": "default-key-policy",
+     "Statement": [
+      {
+       "Action": "kms:*",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:aws:iam::",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":root"
+          ]
+         ]
+        }
+       },
+       "Resource": "*",
+       "Sid": "Enable IAM User Permissions"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PrimaryKeyArn": {
+     "Fn::GetAtt": [
+      "PrimaryRegionCmkRetriever",
+      "RegionalKmsKeyArn"
+     ]
+    }
+   },
+   "Type": "AWS::KMS::ReplicaKey"
+  },
+  "PrimaryRegionCmkRetriever": {
+   "Condition": "IsFailoverRegion",
+   "Properties": {
+    "Properties": {
+     "ExportPrefix": {
+      "Ref": "MainStackName"
+     },
+     "Region": {
+      "Ref": "PrimaryRegionName"
+     },
+     "Version": 1.05
+    },
+    "ServiceToken": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:ssm:/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/RegionalCfnExportRetrieverArn}}"
+      ]
+     ]
+    },
+    "Type": "Custom::GetCFNExports",
+    "Version": "1.0"
+   },
+   "Type": "AWS::CloudFormation::CustomResource"
   },
   "PrimaryRegionDbExportRetriever": {
    "Properties": {
@@ -1984,6 +2112,56 @@
         ]
        }
       ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalKmsKeyArnParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Regional KMS Key ARN for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalKmsKeyArn"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::If": [
+      "IsPrimaryRegion",
+      {
+       "Fn::GetAtt": [
+        "KMSKey",
+        "Arn"
+       ]
+      },
+      {
+       "Fn::GetAtt": [
+        "KMSKeyReplica",
+        "Arn"
+       ]
+      }
      ]
     }
    },

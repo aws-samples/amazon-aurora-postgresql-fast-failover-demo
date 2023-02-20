@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 24, 2023
-  Version: v1.05
+  LastUpdated: February 19, 2023
+  Version: v1.08
 Outputs:
   GlobalAppDbClusterIdentifier:
     Condition: ''
@@ -111,6 +111,17 @@ Outputs:
           - !Split
             - ':'
             - !GetAtt 'PrimaryRegionDbExportRetriever.DemoDbAdminSecretArn'
+  RegionalKmsKeyArn:
+    Condition: ''
+    Export:
+      Name: !Join
+        - '-'
+        - - !Ref 'MainStackName'
+          - RegionalKmsKeyArn
+    Value: !If
+      - IsPrimaryRegion
+      - !GetAtt 'KMSKey.Arn'
+      - !GetAtt 'KMSKeyReplica.Arn'
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -130,11 +141,6 @@ Parameters:
   FailoverDatabaseSubnetZoneBCidr:
     Default: 10.10.13.0/24
     Description: The CIDR range you wish to use for your failover database subnet.
-    Type: String
-  FailoverKmsKeyArn:
-    Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -169,11 +175,6 @@ Parameters:
   PrimaryDatabaseSubnetZoneBCidr:
     Default: 10.10.5.0/24
     Description: The CIDR range you wish to use for your failover database subnet.
-    Type: String
-  PrimaryKmsKeyArn:
-    Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -216,10 +217,6 @@ Resources:
         - ''
         - - 'Failover App DB Cluster Admin Account for '
           - !Ref 'MainStackName'
-      KmsKeyId: !If
-        - IsPrimaryRegion
-        - !Ref 'PrimaryKmsKeyArn'
-        - !Ref 'FailoverKmsKeyArn'
       SecretString: !Join
         - ''
         - - '{"username": "'
@@ -542,8 +539,8 @@ Resources:
       GlobalClusterIdentifier: !GetAtt 'PrimaryRegionDbExportRetriever.GlobalAppDbClusterIdentifier'
       KmsKeyId: !If
         - IsPrimaryRegion
-        - !Ref 'PrimaryKmsKeyArn'
-        - !Ref 'FailoverKmsKeyArn'
+        - !Ref 'KMSKey'
+        - !Ref 'KMSKeyReplica'
       Port: 5432
       RestoreType: copy-on-write
       StorageEncrypted: true
@@ -700,6 +697,66 @@ Resources:
           - !Ref 'PublicFqdn'
           - .internal
     Type: AWS::SSM::Parameter
+  KMSKey:
+    Condition: IsPrimaryRegion
+    Properties:
+      Description: !Join
+        - ''
+        - - 'Muli-Region KMS Key for '
+          - !Ref 'AWS::StackName'
+      EnableKeyRotation: true
+      Enabled: true
+      KeyPolicy:
+        Id: default-key-policy
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - :root
+            Resource: '*'
+            Sid: Enable IAM User Permissions
+        Version: '2012-10-17'
+      MultiRegion: true
+    Type: AWS::KMS::Key
+  KMSKeyReplica:
+    Condition: IsFailoverRegion
+    Properties:
+      Enabled: true
+      KeyPolicy:
+        Id: default-key-policy
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - :root
+            Resource: '*'
+            Sid: Enable IAM User Permissions
+        Version: '2012-10-17'
+      PrimaryKeyArn: !GetAtt 'PrimaryRegionCmkRetriever.RegionalKmsKeyArn'
+    Type: AWS::KMS::ReplicaKey
+  PrimaryRegionCmkRetriever:
+    Condition: IsFailoverRegion
+    Properties:
+      Properties:
+        ExportPrefix: !Ref 'MainStackName'
+        Region: !Ref 'PrimaryRegionName'
+        Version: 1.05
+      ServiceToken: !Join
+        - ''
+        - - '{{resolve:ssm:/'
+          - !Ref 'MainStackName'
+          - /RegionalCfnExportRetrieverArn}}
+      Type: Custom::GetCFNExports
+      Version: '1.0'
+    Type: AWS::CloudFormation::CustomResource
   PrimaryRegionDbExportRetriever:
     Properties:
       Properties:
@@ -1003,6 +1060,27 @@ Resources:
             - !Split
               - ':'
               - !GetAtt 'PrimaryRegionDbExportRetriever.DemoDbAdminSecretArn'
+    Type: AWS::SSM::Parameter
+  RegionalKmsKeyArnParam:
+    Condition: ''
+    Properties:
+      Description: !Join
+        - ''
+        - - 'Regional KMS Key ARN for '
+          - !Ref 'AWS::StackName'
+          - ' stack'
+      Name: !Join
+        - ''
+        - - /
+          - !Ref 'MainStackName'
+          - /
+          - RegionalKmsKeyArn
+      Tier: Standard
+      Type: String
+      Value: !If
+        - IsPrimaryRegion
+        - !GetAtt 'KMSKey.Arn'
+        - !GetAtt 'KMSKeyReplica.Arn'
     Type: AWS::SSM::Parameter
 Transform:
   Name: AWS::SecretsManager-2020-07-23

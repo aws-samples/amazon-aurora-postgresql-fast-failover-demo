@@ -33,8 +33,57 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 24, 2023",
-  "Version": "v1.05"
+  "LastUpdated": "February 19, 2023",
+  "Version": "v1.08"
+ },
+ "Outputs": {
+  "CustomCloudFrontCdnFqdnExport": {
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "-CustomCloudFrontDashboardEndpoint"
+      ]
+     ]
+    }
+   },
+   "Value": {
+    "Fn::Join": [
+     ".",
+     [
+      "dashboard",
+      {
+       "Ref": "PublicFqdn"
+      }
+     ]
+    ]
+   }
+  },
+  "DefaultCloudFrontCdnFqdnExport": {
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "-DefaultCloudFrontDashboardEndpoint"
+      ]
+     ]
+    }
+   },
+   "Value": {
+    "Fn::GetAtt": [
+     "CloudFrontDistribution",
+     "DomainName"
+    ]
+   }
+  }
  },
  "Parameters": {
   "CodeDownloadUrl": {
@@ -59,10 +108,6 @@
   "FailoverDatabaseSubnetZoneBCidr": {
    "Default": "10.10.13.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "FailoverKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "FailoverPrivateSubnetZoneACidr": {
@@ -106,10 +151,6 @@
   "PrimaryDatabaseSubnetZoneBCidr": {
    "Default": "10.10.5.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "PrimaryKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "PrimaryPrivateSubnetZoneACidr": {
@@ -372,48 +413,6 @@
     "Timeout": 30,
     "TracingConfig": {
      "Mode": "PassThrough"
-    },
-    "VpcConfig": {
-     "SecurityGroupIds": [
-      {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:ssm:/",
-         {
-          "Ref": "MainStackName"
-         },
-         "/LambdaSecurityGroupId}}"
-        ]
-       ]
-      }
-     ],
-     "SubnetIds": [
-      {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:ssm:/",
-         {
-          "Ref": "MainStackName"
-         },
-         "/PrivateSubnetZoneAId}}"
-        ]
-       ]
-      },
-      {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:ssm:/",
-         {
-          "Ref": "MainStackName"
-         },
-         "/PrivateSubnetZoneBId}}"
-        ]
-       ]
-      }
-     ]
     }
    },
    "Type": "AWS::Lambda::Function"
@@ -484,8 +483,7 @@
      ]
     },
     "ManagedPolicyArns": [
-     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-     "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
     ],
     "MaxSessionDuration": 3600,
     "Policies": [

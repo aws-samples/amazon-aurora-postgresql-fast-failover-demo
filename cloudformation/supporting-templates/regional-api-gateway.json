@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 24, 2023",
-  "Version": "v1.05"
+  "LastUpdated": "February 19, 2023",
+  "Version": "v1.08"
  },
  "Outputs": {
   "ApiId": {
@@ -78,10 +78,6 @@
    "Description": "The CIDR range you wish to use for your failover database subnet.",
    "Type": "String"
   },
-  "FailoverKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
-   "Type": "String"
-  },
   "FailoverPrivateSubnetZoneACidr": {
    "Default": "10.10.9.0/24",
    "Description": "The CIDR range you wish to use for your primary private subnet.",
@@ -123,10 +119,6 @@
   "PrimaryDatabaseSubnetZoneBCidr": {
    "Default": "10.10.5.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "PrimaryKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "PrimaryPrivateSubnetZoneACidr": {

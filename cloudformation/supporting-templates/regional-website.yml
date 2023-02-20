@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 24, 2023
-  Version: v1.05
+  LastUpdated: February 19, 2023
+  Version: v1.08
 Outputs:
   WebLoadBalancerFqdn:
     Condition: ''
@@ -41,11 +41,6 @@ Parameters:
   FailoverDatabaseSubnetZoneBCidr:
     Default: 10.10.13.0/24
     Description: The CIDR range you wish to use for your failover database subnet.
-    Type: String
-  FailoverKmsKeyArn:
-    Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   FailoverPrivateSubnetZoneACidr:
     Default: 10.10.9.0/24
@@ -80,11 +75,6 @@ Parameters:
   PrimaryDatabaseSubnetZoneBCidr:
     Default: 10.10.5.0/24
     Description: The CIDR range you wish to use for your failover database subnet.
-    Type: String
-  PrimaryKmsKeyArn:
-    Description: >-
-      The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more
-      information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html
     Type: String
   PrimaryPrivateSubnetZoneACidr:
     Default: 10.10.1.0/24
@@ -279,7 +269,7 @@ Resources:
           \ ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    http_status_code = 200\n  \
           \  \n    try: \n        \n        guid = event['queryStringParameters']['guid']\n\n        eastern = dateutil.tz.gettz('US/Eastern')\n\n        sql_statement = \"INSERT INTO dataserver (guid,\
           \ insertedon) VALUES ('\" + str(guid) + \"','\" + datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"') RETURNING id\"\n        \n        app_db_credentials = custom_functions.get_db_credentials('App')\n\
-          \        \n        db_conn = psycopg2.connect(\n            host = os.environ['GLOBAL_APP_DB_WRITER_ENDPOINT'],\n            port = app_db_credentials['port'],\n            user = app_db_credentials['username'],\n\
+          \        \n        db_conn = psycopg2.connect(\n            host = os.environ['REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT'],\n            port = app_db_credentials['port'],\n            user = app_db_credentials['username'],\n\
           \            password = app_db_credentials['password'],\n            database = app_db_credentials['database'],\n            connect_timeout = 3,\n            sslmode = 'require',\n        )\n\
           \        \n        id = 0\n        http_status_code = 200\n        curs = db_conn.cursor()\n        curs.execute(sql_statement)\n        id = curs.fetchone()[0]\n        print(id)\n        db_conn.commit()\n\
           \        curs.close()\n        db_conn.close()\n        \n    except Exception as e:\n        http_status_code = 500\n        print(e)\n        \n    return {\n        'statusCode': http_status_code,\n\
@@ -287,11 +277,11 @@ Resources:
       Description: Serves as the root handler behind the Web ALB
       Environment:
         Variables:
-          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
+          REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /GlobalAppDbWriterDnsEndpoint}}
+              - /RegionalAppDbClusterWriterEndpoint}}
           REGIONAL_APP_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -377,10 +367,11 @@ Resources:
                   - kms:Decrypt
                 Effect: Allow
                 Resource:
-                  - !If
-                    - IsPrimaryRegion
-                    - !Ref 'PrimaryKmsKeyArn'
-                    - !Ref 'FailoverKmsKeyArn'
+                  - !Join
+                    - ''
+                    - - '{{resolve:ssm:/'
+                      - !Ref 'MainStackName'
+                      - /RegionalKmsKeyArn}}
                 Sid: DecryptWithKMS
           PolicyName: database-secret-retrieval
     Type: AWS::IAM::Role

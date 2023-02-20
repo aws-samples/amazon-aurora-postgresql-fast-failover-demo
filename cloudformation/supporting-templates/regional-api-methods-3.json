@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 24, 2023",
-  "Version": "v1.05"
+  "LastUpdated": "February 19, 2023",
+  "Version": "v1.08"
  },
  "Parameters": {
   "CodeDownloadUrl": {
@@ -59,10 +59,6 @@
   "FailoverDatabaseSubnetZoneBCidr": {
    "Default": "10.10.13.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "FailoverKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "FailoverPrivateSubnetZoneACidr": {
@@ -106,10 +102,6 @@
   "PrimaryDatabaseSubnetZoneBCidr": {
    "Default": "10.10.5.0/24",
    "Description": "The CIDR range you wish to use for your failover database subnet.",
-   "Type": "String"
-  },
-  "PrimaryKmsKeyArn": {
-   "Description": "The KMS key to be used for cross-region data encryption (e.g., RDS Aurora, Secrets Manager). This must correspond to a multi-region CMK available in both the primary and failover regions. For more information, visit: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html",
    "Type": "String"
   },
   "PrimaryPrivateSubnetZoneACidr": {
@@ -164,7 +156,7 @@
      "x86_64"
     ],
     "Code": {
-     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    curs.execute('''\n        SELECT \n            insertedon, \n            sum(1) \n        FROM dataclient \n        WHERE http_code = 500 \n        GROUP BY insertedon \n        ORDER BY insertedon DESC\n        LIMIT 15\n    ''');\n    client_errors = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n    \n    data_json = \"\"\n    label_json = \"\"\n    \n    data_arr = []\n    label_arr = []\n    \n    #for i in reversed(range(1,len(client_errors))):\n    #    label_arr.append(str(client_errors[i][0]))\n    #    data_arr.append(str(client_errors[i][1]))\n    \n    for r in reversed(client_errors):\n        \n        label_arr.append(str(r[0]))\n        data_arr.append(str(r[1]))\n        \n    if len(label_arr) > 0:\n        \n        for n in range(len(label_arr) + 1, 16):\n            \n            label_arr.insert(0, custom_functions.subtract_five_seconds(label_arr[0]))\n            data_arr.insert(0, '0')\n        \n        custom_functions.add_time(label_arr,data_arr)\n    \n    i =- 1\n    for r in label_arr:\n        i = i + 1\n        if label_json!=\"\":\n            label_json+=\",\"\n        if data_json!=\"\":\n            data_json+=\",\"\n            \n        data_json += data_arr[i]\n        label_json += label_arr[i]\n    \n    return {\n        'code': 200,\n        'body': json.dumps([{\n            'data': data_json,\n            'labels': label_json, \n        }])\n    }"
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    curs.execute('''\n        SELECT\n            insertedon,\n            sum(CASE WHEN http_code = 200 THEN 0 ELSE 1 END)\n        FROM dataclient\n        WHERE http_code != 0\n        GROUP BY insertedon\n        ORDER BY insertedon DESC\n        LIMIT 15\n    ''');\n    client_errors = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n    \n    data_json = \"\"\n    label_json = \"\"\n    \n    data_arr = []\n    label_arr = []\n    \n    #for i in reversed(range(1,len(client_errors))):\n    #    label_arr.append(str(client_errors[i][0]))\n    #    data_arr.append(str(client_errors[i][1]))\n    \n    for r in reversed(client_errors):\n        \n        label_arr.append(str(r[0]))\n        data_arr.append(str(r[1]))\n        \n    if len(label_arr) > 0:\n        \n        for n in range(len(label_arr) + 1, 16):\n            \n            label_arr.insert(0, custom_functions.subtract_five_seconds(label_arr[0]))\n            data_arr.insert(0, '0')\n        \n        custom_functions.add_time(label_arr,data_arr)\n    \n    i =- 1\n    for r in label_arr:\n        i = i + 1\n        if label_json!=\"\":\n            label_json+=\",\"\n        if data_json!=\"\":\n            data_json+=\",\"\n            \n        data_json += data_arr[i]\n        label_json += label_arr[i]\n    \n    return {\n        'code': 200,\n        'body': json.dumps([{\n            'data': data_json,\n            'labels': label_json, \n        }])\n    }"
     },
     "Description": "Retrieves client errors from the database",
     "Environment": {
@@ -700,14 +692,15 @@
          "Effect": "Allow",
          "Resource": [
           {
-           "Fn::If": [
-            "IsPrimaryRegion",
-            {
-             "Ref": "PrimaryKmsKeyArn"
-            },
-            {
-             "Ref": "FailoverKmsKeyArn"
-            }
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalKmsKeyArn}}"
+            ]
            ]
           }
          ],
@@ -730,7 +723,7 @@
      "x86_64"
     ],
     "Code": {
-     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\t\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\t\nfrom datetime import timedelta\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n    \n    if event['queryParams']['region'] not in ['primary', 'failover']:\n        raise Exception('Invalid Region Specified')\n        \n    curs = db_conn.cursor()\t\n    \n    curs.execute('''\n        SELECT\n            insertedon, \n            sum(1) \n        FROM dataclient \n        WHERE http_code = 200 and {}_region = 1\n        GROUP BY insertedon \n        ORDER BY insertedon \n        DESC limit 15\n    '''.format(event['queryParams']['region']))\n    \n    traffic_records = curs.fetchall()\n    \n    curs.close()\t\n    db_conn.close()\n    \n    data_json = \"\"\n    label_json = \"\"\n    \t\n    data_arr = []\t\n    label_arr = []\t\n    \n    if event['queryParams']['region'] == 'primary':\n        \n        for i in reversed(range(1, len(traffic_records))):\t\n            \n            data_arr.append(str(traffic_records[i][1]))\t\n            label_arr.append(str(traffic_records[i][0]))\n            \n    elif event['queryParams']['region'] == 'failover':\n    \t\n        for i in reversed(traffic_records):\n            \n            data_arr.append(str(i[1]))\n            label_arr.append(str(i[0]))\n        \t\n    if len(label_arr) > 0:\n        \n        for n in range(len(label_arr) + 1, 16):\t\n            \n            data_arr.insert(0, '0')\n            label_arr.insert(0, custom_functions.subtract_five_seconds(label_arr[0]))\t\n        \t\n        custom_functions.add_time(label_arr,data_arr)\t\n    \t\n    i =- 1\t\n    for r in label_arr:\t\n        i = i + 1\t\n        if label_json != \"\":\t\n            label_json += \",\"\t\n        if data_json != \"\":\t\n            data_json += \",\"\t\n            \t\n        data_json += data_arr[i]\t\n        label_json += label_arr[i]\t\n    \t\n    return {\n        'code': 200,\n        'body': json.dumps([{\n            'data': data_json,\n            'labels': label_json,\n        }])\n    }\t"
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\t\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\t\nfrom datetime import timedelta\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n    \n    if event['queryParams']['region'] not in ['primary', 'failover']:\n        raise Exception('Invalid Region Specified')\n        \n    curs = db_conn.cursor()\t\n    \n    curs.execute('''\n        SELECT\n            insertedon,\n            sum(CASE WHEN http_code = 200 AND {}_region = 1 THEN 1 ELSE 0 END)\n        FROM dataclient\n        WHERE http_code != 0\n        GROUP BY insertedon\n        ORDER BY insertedon\n        DESC limit 15\n    '''.format(event['queryParams']['region']))\n    \n    traffic_records = curs.fetchall()\n    \n    curs.close()\t\n    db_conn.close()\n    \n    data_json = \"\"\n    label_json = \"\"\n    \t\n    data_arr = []\t\n    label_arr = []\t\n    \n    if event['queryParams']['region'] == 'primary':\n        \n        for i in reversed(range(1, len(traffic_records))):\t\n            \n            data_arr.append(str(traffic_records[i][1]))\t\n            label_arr.append(str(traffic_records[i][0]))\n            \n    elif event['queryParams']['region'] == 'failover':\n    \t\n        for i in reversed(traffic_records):\n            \n            data_arr.append(str(i[1]))\n            label_arr.append(str(i[0]))\n        \t\n    if len(label_arr) > 0:\n        \n        for n in range(len(label_arr) + 1, 16):\t\n            \n            data_arr.insert(0, '0')\n            label_arr.insert(0, custom_functions.subtract_five_seconds(label_arr[0]))\t\n        \t\n        custom_functions.add_time(label_arr,data_arr)\t\n    \t\n    i =- 1\t\n    for r in label_arr:\t\n        i = i + 1\t\n        if label_json != \"\":\t\n            label_json += \",\"\t\n        if data_json != \"\":\t\n            data_json += \",\"\t\n            \t\n        data_json += data_arr[i]\t\n        label_json += label_arr[i]\t\n    \t\n    return {\n        'code': 200,\n        'body': json.dumps([{\n            'data': data_json,\n            'labels': label_json,\n        }])\n    }\t"
     },
     "Description": "Retrieves client traffic logs from the database",
     "Environment": {
@@ -1266,14 +1259,15 @@
          "Effect": "Allow",
          "Resource": [
           {
-           "Fn::If": [
-            "IsPrimaryRegion",
-            {
-             "Ref": "PrimaryKmsKeyArn"
-            },
-            {
-             "Ref": "FailoverKmsKeyArn"
-            }
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalKmsKeyArn}}"
+            ]
            ]
           }
          ],
@@ -1991,14 +1985,15 @@
          "Effect": "Allow",
          "Resource": [
           {
-           "Fn::If": [
-            "IsPrimaryRegion",
-            {
-             "Ref": "PrimaryKmsKeyArn"
-            },
-            {
-             "Ref": "FailoverKmsKeyArn"
-            }
+           "Fn::Join": [
+            "",
+            [
+             "{{resolve:ssm:/",
+             {
+              "Ref": "MainStackName"
+             },
+             "/RegionalKmsKeyArn}}"
+            ]
            ]
           }
          ],
