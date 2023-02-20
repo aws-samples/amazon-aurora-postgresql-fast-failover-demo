@@ -26,12 +26,12 @@ def handler(event, context):
         
     curs = db_conn.cursor()
     curs.execute('''
-        SELECT 
-            insertedon, 
-            sum(1) 
-        FROM dataclient 
-        WHERE http_code = 500 
-        GROUP BY insertedon 
+        SELECT
+            insertedon,
+            sum(CASE WHEN http_code = 200 THEN 0 ELSE 1 END)
+        FROM dataclient
+        WHERE http_code != 0
+        GROUP BY insertedon
         ORDER BY insertedon DESC
         LIMIT 15
     ''');

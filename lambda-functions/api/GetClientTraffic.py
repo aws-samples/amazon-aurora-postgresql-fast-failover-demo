@@ -34,12 +34,12 @@ def handler(event, context):
     
     curs.execute('''
         SELECT
-            insertedon, 
-            sum(1) 
-        FROM dataclient 
-        WHERE http_code = 200 and {}_region = 1
-        GROUP BY insertedon 
-        ORDER BY insertedon 
+            insertedon,
+            sum(CASE WHEN http_code = 200 AND {}_region = 1 THEN 1 ELSE 0 END)
+        FROM dataclient
+        WHERE http_code != 0
+        GROUP BY insertedon
+        ORDER BY insertedon
         DESC limit 15
     '''.format(event['queryParams']['region']))
     
@@ -53,15 +53,20 @@ def handler(event, context):
     	
     data_arr = []	
     label_arr = []	
-    	
-    for i in reversed(range(1, len(traffic_records))):	
+    
+    if event['queryParams']['region'] == 'primary':
         
-        data_arr.append(str(traffic_records[i][1]))	
-        label_arr.append(str(traffic_records[i][0]))	
+        for i in reversed(range(1, len(traffic_records))):	
+            
+            data_arr.append(str(traffic_records[i][1]))	
+            label_arr.append(str(traffic_records[i][0]))
+            
+    elif event['queryParams']['region'] == 'failover':
     	
-    #for r in reversed(traffic_records):	
-    #    label_arr.append(str(r[0]))	
-    #    data_arr.append(str(r[1]))	
+        for i in reversed(traffic_records):
+            
+            data_arr.append(str(i[1]))
+            label_arr.append(str(i[0]))
         	
     if len(label_arr) > 0:
         
