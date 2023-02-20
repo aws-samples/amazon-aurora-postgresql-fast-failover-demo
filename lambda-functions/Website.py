@@ -29,7 +29,7 @@ def handler(event, context):
         app_db_credentials = custom_functions.get_db_credentials('App')
         
         db_conn = psycopg2.connect(
-            host = os.environ['GLOBAL_APP_DB_WRITER_ENDPOINT'],
+            host = os.environ['REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT'],
             port = app_db_credentials['port'],
             user = app_db_credentials['username'],
             password = app_db_credentials['password'],
