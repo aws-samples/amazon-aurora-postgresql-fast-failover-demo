@@ -122,12 +122,11 @@ class Functions:
     
         eastern = dateutil.tz.gettz('US/Pacific')
         mynow = datetime.now(tz = eastern)
-        print((datetime.strptime(label[len(label) - 1], '%H:%M:%S') + timedelta(seconds = 9)))
-        print(datetime.strptime(mynow.strftime("%H:%M:%S"), '%H:%M:%S'))
+        #print((datetime.strptime(label[len(label) - 1], '%H:%M:%S') + timedelta(seconds = 9)))
+        #print(datetime.strptime(mynow.strftime("%H:%M:%S"), '%H:%M:%S'))
         
         while((datetime.strptime(label[len(label)-1], '%H:%M:%S') + timedelta(seconds = 9)) < datetime.strptime(mynow.strftime("%H:%M:%S"), '%H:%M:%S')):
             
-            print('add')
             label.pop(0)
             data.pop(0)
             
