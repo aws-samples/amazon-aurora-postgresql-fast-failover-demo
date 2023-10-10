@@ -83,8 +83,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: February 20, 2023
-  Version: v1.09
+  LastUpdated: October 10, 2023
+  Version: v1.1
 Outputs:
   CrossRegionFailoverDemoUrl:
     Value: !Join
@@ -306,8 +306,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           ApiHostExport:
             Export:
@@ -622,8 +622,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           ApiId:
             Condition: ''
@@ -882,8 +882,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -2020,8 +2020,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -3170,8 +3170,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -3897,8 +3897,8 @@ Resources:
                 ZipFile: "_F='PRIVATE_HOSTED_ZONE_ID'\n_E='WRITER'\n_D='READER'\n_C='PUBLIC_FQDN'\n_B='_ENDPOINT'\n_A=True\nimport sys\nsys.path.append('/opt')\nimport os,json,boto3,psycopg2,dateutil.tz,multi_region_db\n\
                   from datetime import datetime\nfrom botocore.exceptions import ClientError as boto3_client_error\ncustom_functions=multi_region_db.Functions()\nevent_bridge_client=ec2_client=boto3.client('events',region_name=os.environ['FAILOVER_REGION_NAME'])\n\
                   def point_service_fqdn_to_primary_web_alb():\n\tA=boto3.client('route53')\n\ttry:A.change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':os.environ[_C],'AliasTarget':{'DNSName':os.environ['REGIONAL_WEB_ALB_FQDN'],'HostedZoneId':os.environ['REGIONAL_WEB_ALB_HOSTED_ZONE_ID'],'EvaluateTargetHealth':False},'Type':'A'}}]},HostedZoneId=os.environ['PUBLIC_HOSTED_ZONE_ID'])\n\
-                  \texcept boto3_client_error as B:raise Exception('Failed to Update DNS Record: '+str(B))\n\treturn _A\ndef point_global_app_db_endpoints_to_primary_proxy():\n\tfor A in [_D,_E]:custom_functions.update_dns_record(fqdn=os.environ['GLOBAL_APP_DB_'+A+_B],new_value=os.environ['REGIONAL_APP_DB_PROXY_'+A+_B],hosted_zone_id=os.environ[_F])\n\
-                  def point_global_app_db_cluster_endpoints_to_primary_cluster():\n\tfor A in [_D,_E]:custom_functions.update_dns_record(fqdn='db.cluster.'+A+'.'+os.environ[_C]+'.internal',new_value=os.environ['REGIONAL_APP_DB_CLUSTER_'+A+_B],hosted_zone_id=os.environ[_F])\n\
+                  \texcept boto3_client_error as B:raise Exception('Failed to Update DNS Record: '+str(B))\n\treturn _A\ndef point_global_app_db_endpoints_to_primary_proxy():\n\tfor A in[_D,_E]:custom_functions.update_dns_record(fqdn=os.environ['GLOBAL_APP_DB_'+A+_B],new_value=os.environ['REGIONAL_APP_DB_PROXY_'+A+_B],hosted_zone_id=os.environ[_F])\n\
+                  def point_global_app_db_cluster_endpoints_to_primary_cluster():\n\tfor A in[_D,_E]:custom_functions.update_dns_record(fqdn='db.cluster.'+A+'.'+os.environ[_C]+'.internal',new_value=os.environ['REGIONAL_APP_DB_CLUSTER_'+A+_B],hosted_zone_id=os.environ[_F])\n\
                   def allow_traffic_to_primary_db_cluster():\n\tA=boto3.client('ec2')\n\ttry:A.replace_network_acl_entry(Egress=False,Protocol='-1',CidrBlock='0.0.0.0/0',RuleAction='allow',RuleNumber=100,NetworkAclId=os.environ['REGIONAL_APP_DB_NACL_ID'])\n\
                   \texcept boto3_client_error as B:raise Exception('Failed to Reset NACL: '+str(B))\ndef prune_db_tables(db_identifier,table_names):\n\tC=db_identifier;A=custom_functions.get_db_credentials(C);B=psycopg2.connect(host=os.environ['GLOBAL_'+C.upper()+'_DB_WRITER_ENDPOINT'],port=A['port'],user=A['username'],sslmode='require',password=A['password'],database=A['database'],connect_timeout=3)\n\
                   \tfor E in table_names:D=B.cursor();D.execute('DELETE FROM '+E);B.commit()\n\tD.close();B.close();return _A\ndef disable_proxy_monitor_rule():\n\ttry:event_bridge_client.disable_rule(Name=os.environ['PROXY_MONITOR_CRON_NAME'])\n\
@@ -4421,8 +4421,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -4950,7 +4950,7 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
+        ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
           \ '/tmp/')\n\nimport io\nimport os\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Region | str\n    - ExportPrefix\
           \ | str\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::',\
           \ '')\n    \n    response_data = {}\n    \n    boto3Session = boto3.Session(\n        region_name = arguments['Region']\n    )\n    \n    cfn_client = boto3Session.client('cloudformation')\n \
@@ -5099,8 +5099,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           RegionalCfnExportRetrieverArn:
             Condition: ''
@@ -5210,7 +5210,7 @@ Resources:
               Architectures:
                 - x86_64
               Code:
-                ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
+                ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
                   \ '/tmp/')\n\nimport io\nimport os\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Region | str\n    - ExportPrefix\
                   \ | str\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::',\
                   \ '')\n    \n    response_data = {}\n    \n    boto3Session = boto3.Session(\n        region_name = arguments['Region']\n    )\n    \n    cfn_client = boto3Session.client('cloudformation')\n \
@@ -5273,7 +5273,7 @@ Resources:
               Architectures:
                 - x86_64
               Code:
-                ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
+                ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
                   \ '/tmp/')\n\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Fqdns | list \n    - HostedZoneId | str\n'''\ndef handler(event,\
                   \ context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::', '')\n\
                   \    \n    response_data = {}\n    \n    route53_client = boto3.client('route53')\n    \n    if event['RequestType'] in ['Delete']:\n        \n        try:\n            \n            record_sets_resp\
@@ -5349,17 +5349,17 @@ Resources:
               Architectures:
                 - x86_64
               Code:
-                ZipFile: "_A='%H:%M:%S'\nimport sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\n\
-                  import io,os,json,boto3,shutil,cfnresponse\nfrom zipfile import ZipFile\nfrom botocore.exceptions import ClientError as boto3_client_error\ndef zip_directory(path):\n\tfor (B,F,C) in os.walk(path):\n\
-                  \t\tfor D in C:A=os.path.join(B,D);E=A[len(path)+len(os.sep):];yield(A,E)\ndef make_zip_file_bytes(path):\n\tA=io.BytesIO()\n\twith ZipFile(A,'w')as B:\n\t\tfor (C,D) in zip_directory(path=path):B.write(C,D)\n\
+                ZipFile: "_A='%H:%M:%S'\nimport sys,subprocess\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\n\
+                  import io,os,json,boto3,shutil,cfnresponse\nfrom zipfile import ZipFile\nfrom botocore.exceptions import ClientError as boto3_client_error\ndef zip_directory(path):\n\tfor(B,F,C)in os.walk(path):\n\
+                  \t\tfor D in C:A=os.path.join(B,D);E=A[len(path)+len(os.sep):];yield(A,E)\ndef make_zip_file_bytes(path):\n\tA=io.BytesIO()\n\twith ZipFile(A,'w')as B:\n\t\tfor(C,D)in zip_directory(path=path):B.write(C,D)\n\
                   \treturn A.getvalue()\n'\\n    - Region | str\\n    - Packages | list\\n    - LayerName | str\\n'\ndef handler(event,context):\n\tJ='RequestType';I='ResourceProperties';G='LayerName';C=context;A=event;print(json.dumps(A));B=A[I]['Properties'];N=A[I]['Type'].replace('Custom::','');D={};K=boto3.Session(region_name=B['Region']);E=K.client('lambda')\n\
                   \tif A[J]in['Create','Update']:\n\t\tsubprocess.call(('pip install '+' '.join(B['Packages'])+' -t /tmp/lambda-layer --no-cache-dir').split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);shutil.copyfile(os.path.realpath(__file__),'/tmp/lambda-layer/multi_region_db.py')\n\
                   \t\ttry:H=E.publish_layer_version(LayerName=B[G],Content={'ZipFile':make_zip_file_bytes('/tmp/lambda-layer')},CompatibleRuntimes=['python3.9'],CompatibleArchitectures=['x86_64','arm64']);return\
                   \ cfnresponse.send(A,C,cfnresponse.SUCCESS,D,H['LayerVersionArn'])\n\t\texcept boto3_client_error as F:print('Failed to Deploy Lambda Layer: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\
                   \tif A[J]in['Delete']:\n\t\ttry:\n\t\t\tL=E.list_layer_versions(LayerName=B[G])\n\t\t\tfor M in L['LayerVersions']:H=E.delete_layer_version(LayerName=B[G],VersionNumber=M['Version'])\n\t\texcept\
                   \ boto3_client_error as F:print('Failed to Delete Layer Versions: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\t\treturn cfnresponse.send(A,C,cfnresponse.SUCCESS,D)\n\
-                  import dateutil.tz\nfrom datetime import datetime\nfrom datetime import timedelta\nclass Functions:\n\tdef __init__(A):''\n\tdef add_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=5)).strftime(_A)\n\
-                  \tdef subtract_five_seconds(A,start_time):return (datetime.strptime(str(start_time),_A)+timedelta(seconds=-5)).strftime(_A)\n\tdef add_time(B,label,data):\n\t\tA=label;C=dateutil.tz.gettz('US/Pacific');D=datetime.now(tz=C)\n\
+                  import dateutil.tz\nfrom datetime import datetime\nfrom datetime import timedelta\nclass Functions:\n\tdef __init__(A):''\n\tdef add_five_seconds(A,start_time):return(datetime.strptime(str(start_time),_A)+timedelta(seconds=5)).strftime(_A)\n\
+                  \tdef subtract_five_seconds(A,start_time):return(datetime.strptime(str(start_time),_A)+timedelta(seconds=-5)).strftime(_A)\n\tdef add_time(B,label,data):\n\t\tA=label;C=dateutil.tz.gettz('US/Pacific');D=datetime.now(tz=C)\n\
                   \t\twhile datetime.strptime(A[len(A)-1],_A)+timedelta(seconds=9)<datetime.strptime(D.strftime(_A),_A):A.pop(0);data.pop(0);A.append(B.add_five_seconds(A[len(A)-1]));data.append('0')\n\t'\\n  \
                   \      Requires \"REGIONAL_(APP|DEMO)_DB_SECRET_ARN\" as an environment variable\\n        \\n        - db_identifier | str (App|Demo)\\n    '\n\tdef get_db_credentials(E,db_identifier):\n\t\t\
                   A=db_identifier;B=boto3.client('secretsmanager')\n\t\ttry:C=B.get_secret_value(SecretId=os.environ['REGIONAL_'+A.upper()+'_DB_SECRET_ARN'])\n\t\texcept boto3_client_error as D:raise Exception('Failed\
@@ -5618,8 +5618,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           CustomCloudFrontCdnFqdnExport:
             Export:
@@ -5818,8 +5818,8 @@ Resources:
               Architectures:
                 - x86_64
               Code:
-                ZipFile: "import sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\nimport\
-                  \ os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\nfrom collections import defaultdict\nfrom botocore.exceptions import ClientError as boto3_client_error\nhttp=urllib3.PoolManager()\n\
+                ZipFile: "import sys,subprocess\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\n\
+                  import os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\nfrom collections import defaultdict\nfrom botocore.exceptions import ClientError as boto3_client_error\nhttp=urllib3.PoolManager()\n\
                   try:from urllib2 import HTTPError,build_opener,HTTPHandler,Request\nexcept ImportError:from urllib.error import HTTPError;from urllib.request import build_opener,HTTPHandler,Request\n'\\n    -\
                   \ CodeBucketName | str\\n    - CodeDownloadUrl | str\\n'\ndef handler(event,context):\n\tU='VersionId';T='Key';S='/dashboard/';R=False;Q='RequestType';J='CodeBucketName';D=context;A=event;print(json.dumps(A));C=A['ResourceProperties']['Properties'];E=boto3.client('s3');F={}\n\
                   \tif A[Q]in['Create','Update']:\n\t\tG='/tmp/dashboard_code.zip';K=G.replace('.zip','');'\\n            Download the codebase\\n        ';V=urllib3.PoolManager();L=V.request('GET',C['CodeDownloadUrl'],preload_content=R)\n\
@@ -5827,7 +5827,7 @@ Resources:
                   \t\t'\\n            For each file in the local code directory\\n        '\n\t\tfor B in glob.iglob(K+'**/**',recursive=True):\n\t\t\t\"\\n                If it's one of the dashboard files and\
                   \ it's a file, not a directory, we'll upload it to S3\\n            \"\n\t\t\tif S in B and os.path.isfile(B):\n\t\t\t\ttry:Z=B.split(S)[1];E.upload_file(B,C[J],Z,ExtraArgs={'ContentType':mimetypes.guess_type(B)[0]})\n\
                   \t\t\t\texcept boto3_client_error as H:print('Failed to Upload Dashboard File: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\telif A[Q]in['Delete']:\n\t\t\"\\n            Here,\
-                  \ we'll delete all objects, versions, and delete markers from the bucket.\\n        \";a=E.get_paginator('list_object_versions');I=[]\n\t\tfor M in a.paginate(Bucket=C[J]):\n\t\t\tfor N in ['Versions','DeleteMarkers']:\n\
+                  \ we'll delete all objects, versions, and delete markers from the bucket.\\n        \";a=E.get_paginator('list_object_versions');I=[]\n\t\tfor M in a.paginate(Bucket=C[J]):\n\t\t\tfor N in['Versions','DeleteMarkers']:\n\
                   \t\t\t\tif N in M:\n\t\t\t\t\tfor O in M[N]:I.append({T:O[T],U:O[U]})\n\t\tfor P in range(0,len(I),1000):\n\t\t\ttry:b=E.delete_objects(Bucket=C[J],Delete={'Objects':I[P:P+1000],'Quiet':True})\n\
                   \t\t\texcept boto3_client_error as H:print('Failed to Delete S3 Objects: '+str(H));return cfnresponse.send(A,D,cfnresponse.FAILED,F)\n\treturn cfnresponse.send(A,D,cfnresponse.SUCCESS,F)"
               Description: Downloads dashboard code from a remote repo and deploys it to Amazon S3
@@ -6055,8 +6055,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           GlobalAppDbClusterIdentifier:
             Condition: ''
@@ -7224,8 +7224,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Parameters:
           CodeDownloadUrl:
             Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -8463,8 +8463,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           DatabaseSubnetZoneAId:
             Condition: ''
@@ -9260,8 +9260,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           GlobalAppDbClusterIdentifier:
             Condition: ''
@@ -10841,8 +10841,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           PeeringConnectionIdExport:
             Condition: IsPrimaryRegion
@@ -11132,8 +11132,8 @@ Resources:
           Comments: ''
           CreatedBy: Carter Meyers (AWS)
           Description: This application deploys a Global RDS Aurora cluster.
-          LastUpdated: February 20, 2023
-          Version: v1.09
+          LastUpdated: October 10, 2023
+          Version: v1.1
         Outputs:
           WebLoadBalancerFqdn:
             Condition: ''
