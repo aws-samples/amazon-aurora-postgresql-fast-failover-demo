@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: October 10, 2023
-  Version: v1.1
+  LastUpdated: January 31, 2024
+  Version: v1.11
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -174,7 +174,7 @@ Resources:
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
       Role: !GetAtt 'DatabaseCanaryRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 65
       TracingConfig:
         Mode: PassThrough
@@ -457,7 +457,7 @@ Resources:
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
       Role: !GetAtt 'FailoverCompletedHandlerRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 15
       TracingConfig:
         Mode: PassThrough
@@ -726,7 +726,7 @@ Resources:
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
       Role: !GetAtt 'FailoverStartedHandlerRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 15
       TracingConfig:
         Mode: PassThrough
@@ -959,7 +959,7 @@ Resources:
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
       Role: !GetAtt 'RdsProxyMonitorRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 120
       TracingConfig:
         Mode: PassThrough

@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: October 10, 2023
-  Version: v1.1
+  LastUpdated: January 31, 2024
+  Version: v1.11
 Outputs:
   CustomCloudFrontCdnFqdnExport:
     Export:
@@ -213,8 +213,8 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys,subprocess\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\n\
-          import os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\nfrom collections import defaultdict\nfrom botocore.exceptions import ClientError as boto3_client_error\nhttp=urllib3.PoolManager()\n\
+        ZipFile: "import sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\nimport\
+          \ os,json,glob,boto3,shutil,urllib3,zipfile,mimetypes,cfnresponse\nfrom collections import defaultdict\nfrom botocore.exceptions import ClientError as boto3_client_error\nhttp=urllib3.PoolManager()\n\
           try:from urllib2 import HTTPError,build_opener,HTTPHandler,Request\nexcept ImportError:from urllib.error import HTTPError;from urllib.request import build_opener,HTTPHandler,Request\n'\\n    -\
           \ CodeBucketName | str\\n    - CodeDownloadUrl | str\\n'\ndef handler(event,context):\n\tU='VersionId';T='Key';S='/dashboard/';R=False;Q='RequestType';J='CodeBucketName';D=context;A=event;print(json.dumps(A));C=A['ResourceProperties']['Properties'];E=boto3.client('s3');F={}\n\
           \tif A[Q]in['Create','Update']:\n\t\tG='/tmp/dashboard_code.zip';K=G.replace('.zip','');'\\n            Download the codebase\\n        ';V=urllib3.PoolManager();L=V.request('GET',C['CodeDownloadUrl'],preload_content=R)\n\
@@ -239,7 +239,7 @@ Resources:
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
       Role: !GetAtt 'DashboardCodeDeployerRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 30
       TracingConfig:
         Mode: PassThrough

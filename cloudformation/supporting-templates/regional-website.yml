@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: October 10, 2023
-  Version: v1.1
+  LastUpdated: January 31, 2024
+  Version: v1.11
 Outputs:
   WebLoadBalancerFqdn:
     Condition: ''
@@ -296,7 +296,7 @@ Resources:
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
       Role: !GetAtt 'WebsiteRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 15
       TracingConfig:
         Mode: PassThrough

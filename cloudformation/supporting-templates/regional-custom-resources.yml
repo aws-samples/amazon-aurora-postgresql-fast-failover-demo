@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: October 10, 2023
-  Version: v1.1
+  LastUpdated: January 31, 2024
+  Version: v1.11
 Outputs:
   RegionalCfnExportRetrieverArn:
     Condition: ''
@@ -124,7 +124,7 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
+        ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
           \ '/tmp/')\n\nimport io\nimport os\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Region | str\n    - ExportPrefix\
           \ | str\n'''\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::',\
           \ '')\n    \n    response_data = {}\n    \n    boto3Session = boto3.Session(\n        region_name = arguments['Region']\n    )\n    \n    cfn_client = boto3Session.client('cloudformation')\n \
@@ -138,7 +138,7 @@ Resources:
       Layers: []
       MemorySize: 128
       Role: !GetAtt 'CfnExportRetrieverRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 15
       TracingConfig:
         Mode: PassThrough
@@ -187,7 +187,7 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
+        ZipFile: "import sys\nimport subprocess\n\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)\nsys.path.insert(1,\
           \ '/tmp/')\n\nimport json\nimport boto3\nimport cfnresponse\nfrom botocore.exceptions import ClientError, ParamValidationError\n\n'''\n    - Fqdns | list \n    - HostedZoneId | str\n'''\ndef handler(event,\
           \ context):\n    \n    print(json.dumps(event))\n    \n    arguments = event['ResourceProperties']['Properties']\n    operation = event['ResourceProperties']['Type'].replace('Custom::', '')\n\
           \    \n    response_data = {}\n    \n    route53_client = boto3.client('route53')\n    \n    if event['RequestType'] in ['Delete']:\n        \n        try:\n            \n            record_sets_resp\
@@ -206,7 +206,7 @@ Resources:
       Layers: []
       MemorySize: 128
       Role: !GetAtt 'DnsRecordDeleterRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 15
       TracingConfig:
         Mode: PassThrough
@@ -263,12 +263,12 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "_A='%H:%M:%S'\nimport sys,subprocess\nsubprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\n\
+        ZipFile: "_A='%H:%M:%S'\nimport sys,subprocess\nsubprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\nsys.path.insert(1,'/tmp/')\n\
           import io,os,json,boto3,shutil,cfnresponse\nfrom zipfile import ZipFile\nfrom botocore.exceptions import ClientError as boto3_client_error\ndef zip_directory(path):\n\tfor(B,F,C)in os.walk(path):\n\
           \t\tfor D in C:A=os.path.join(B,D);E=A[len(path)+len(os.sep):];yield(A,E)\ndef make_zip_file_bytes(path):\n\tA=io.BytesIO()\n\twith ZipFile(A,'w')as B:\n\t\tfor(C,D)in zip_directory(path=path):B.write(C,D)\n\
           \treturn A.getvalue()\n'\\n    - Region | str\\n    - Packages | list\\n    - LayerName | str\\n'\ndef handler(event,context):\n\tJ='RequestType';I='ResourceProperties';G='LayerName';C=context;A=event;print(json.dumps(A));B=A[I]['Properties'];N=A[I]['Type'].replace('Custom::','');D={};K=boto3.Session(region_name=B['Region']);E=K.client('lambda')\n\
           \tif A[J]in['Create','Update']:\n\t\tsubprocess.call(('pip install '+' '.join(B['Packages'])+' -t /tmp/lambda-layer --no-cache-dir').split(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);shutil.copyfile(os.path.realpath(__file__),'/tmp/lambda-layer/multi_region_db.py')\n\
-          \t\ttry:H=E.publish_layer_version(LayerName=B[G],Content={'ZipFile':make_zip_file_bytes('/tmp/lambda-layer')},CompatibleRuntimes=['python3.9'],CompatibleArchitectures=['x86_64','arm64']);return\
+          \t\ttry:H=E.publish_layer_version(LayerName=B[G],Content={'ZipFile':make_zip_file_bytes('/tmp/lambda-layer')},CompatibleRuntimes=['python3.9','python3.10','python3.11','python3.12'],CompatibleArchitectures=['x86_64','arm64']);return\
           \ cfnresponse.send(A,C,cfnresponse.SUCCESS,D,H['LayerVersionArn'])\n\t\texcept boto3_client_error as F:print('Failed to Deploy Lambda Layer: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\
           \tif A[J]in['Delete']:\n\t\ttry:\n\t\t\tL=E.list_layer_versions(LayerName=B[G])\n\t\t\tfor M in L['LayerVersions']:H=E.delete_layer_version(LayerName=B[G],VersionNumber=M['Version'])\n\t\texcept\
           \ boto3_client_error as F:print('Failed to Delete Layer Versions: '+str(F.response));return cfnresponse.send(A,C,cfnresponse.FAILED,D)\n\t\treturn cfnresponse.send(A,C,cfnresponse.SUCCESS,D)\n\
@@ -285,7 +285,7 @@ Resources:
       Layers: []
       MemorySize: 256
       Role: !GetAtt 'LambdaLayerCreatorRole.Arn'
-      Runtime: python3.9
+      Runtime: python3.11
       Timeout: 60
       TracingConfig:
         Mode: PassThrough

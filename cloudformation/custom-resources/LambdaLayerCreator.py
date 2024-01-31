@@ -1,7 +1,7 @@
 import sys
 import subprocess
 
-subprocess.call('pip install urllib3<2 cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+subprocess.call('pip install cfnresponse -t /tmp/ --no-cache-dir'.split(), stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
 sys.path.insert(1, '/tmp/')
 
 import io
@@ -67,6 +67,9 @@ def handler(event, context):
                 },
                 CompatibleRuntimes = [
                     'python3.9',
+                    'python3.10',
+                    'python3.11',
+                    'python3.12',
                 ],
                 CompatibleArchitectures = [
                     'x86_64', 'arm64',
