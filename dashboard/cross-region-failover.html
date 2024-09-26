@@ -276,7 +276,7 @@
                                                             <i id="canaryfailover_badge" class="badge badge-dot badge-dot-xl badge-secondary"> </i>
                                                         </span>
                                                 <div class="vertical-timeline-element-content bounce-in">
-                                                    <p id="canaryfailover_title" style="font-size: 1rem;">CANARY - FAILOVER TRIGGERED</p>
+                                                    <p id="canaryfailover_title" style="font-size: 1rem;">Outage Detected - Failover Triggered</p>
                                                     <p id="canaryfailover_lapsed" style="font-size: 1rem;"></p>
                                                     <span id="canaryfailover_time" class="vertical-timeline-element-date"></span>
                                                 </div>
@@ -306,19 +306,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="vertical-timeline-item vertical-timeline-element">
-                                            <div>
-                                                <span class="vertical-timeline-element-icon bounce-in">
-                                                            <i id="rdsproxy_badge" class="badge badge-dot badge-dot-xl badge-secondary"> </i>
-                                                        </span>
-                                                <div class="vertical-timeline-element-content bounce-in">
-                                                    <p id="rdsproxy_title" style="font-size: 1rem;">RDS PROXY - DATABASE REGISTERED</p>
-                                                    <p id="rdsproxy_lapsed" style="font-size: 1rem;"></p>
-                                                    <span id="rdsproxy_time" class="vertical-timeline-element-date"></span>
-                                                </div>
-                                            </div>
-                                        </div>
-
                                     </div>
                                 </div>
 
@@ -411,14 +398,6 @@
         				$('#cnameupdate_time').text(failover_events[i]['time'])
         				$('#cnameupdate_lapsed').text('Lapsed ' + Math.round(Math.abs(new Date(failover_events[i]['insertedon']) - new Date(failover_events[0]['insertedon'])) / 1000) + ' sec')
         				$('#myCarousel').carousel(3);
-        			}
-        			else if (failover_events[i]['event'] == '5')
-        			{
-        				$('#rdsproxy_badge').addClass('badge-success');
-        				$('#rdsproxy_title').addClass('timeline-title');
-        				$('#rdsproxy_time').text(failover_events[i]['time'])
-        				$('#rdsproxy_lapsed').text('Lapsed ' + Math.round(Math.abs(new Date(failover_events[i]['insertedon']) - new Date(failover_events[0]['insertedon'])) / 1000) + ' sec')
-        				$('#myCarousel').carousel(4);
         			}
         		}
         	}
