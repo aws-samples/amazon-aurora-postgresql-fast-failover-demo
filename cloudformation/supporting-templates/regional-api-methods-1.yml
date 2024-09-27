@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -92,8 +92,6 @@ Parameters:
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
-    Type: String
-  PrivateHostedZoneId:
     Type: String
   PublicFqdn:
     Description: >-
@@ -412,7 +410,7 @@ Resources:
         - x86_64
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n\
-          \    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
+          \    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n\
           \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
           \        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    \n    curs.execute('''\n        SELECT \n            event,\n            to_char(insertedon,'HH24:MI:SS')\
           \ AS time, \n            insertedon \n        FROM failoverevents\n        ORDER BY insertedon\n    ''');\n    \n    failover_events = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n\
@@ -421,11 +419,11 @@ Resources:
       Description: Retrieves failover events from the database
       Environment:
         Variables:
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -721,26 +719,26 @@ Resources:
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport multi_region_db\nfrom botocore.exceptions import\
           \ ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
-          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port\
-          \ = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
-          \        connect_timeout = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz = eastern).strftime(\"\
-          %m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \n    try:\n        \n        boto3.client('ec2').replace_network_acl_entry(\n         \
-          \   Egress = False, \n            CidrBlock = '0.0.0.0/0',\n            NetworkAclId = os.environ['REGIONAL_APP_DB_NACL_ID'],\n            Protocol = '-1',\n            RuleAction = 'deny',\n\
+          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n  \
+          \      port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database\
+          \ = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz\
+          \ = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \n    try:\n        \n        boto3.client('ec2').replace_network_acl_entry(\n\
+          \            Egress = False, \n            CidrBlock = '0.0.0.0/0',\n            NetworkAclId = os.environ['REGIONAL_APP_DB_NACL_ID'],\n            Protocol = '-1',\n            RuleAction = 'deny',\n\
           \            RuleNumber = 100\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Update Database NACL')\n    \n    return {\n        'code': 200,\n \
           \       'body': json.dumps([])\n    }"
       Description: Updates the database NACL to deny incoming traffic
       Environment:
         Variables:
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
           REGIONAL_APP_DB_NACL_ID: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /RegionalAppDatabaseNaclId}}
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'

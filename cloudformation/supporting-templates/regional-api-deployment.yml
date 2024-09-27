@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Outputs:
   ApiHostExport:
     Export:
@@ -127,8 +127,6 @@ Parameters:
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
-    Type: String
-  PrivateHostedZoneId:
     Type: String
   PublicFqdn:
     Description: >-

@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -93,8 +93,6 @@ Parameters:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
-  PrivateHostedZoneId:
-    Type: String
   PublicFqdn:
     Description: >-
       The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
@@ -113,7 +111,7 @@ Resources:
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport uuid\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport urllib.request\nimport multi_region_db\nfrom botocore.vendored\
           \ import requests\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    guid = uuid.uuid4()\n    \n    eastern\
-          \ = dateutil.tz.gettz('US/Eastern')\n\n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
+          \ = dateutil.tz.gettz('US/Eastern')\n\n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n\
           \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
           \        connect_timeout = 3,\n        sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    \n    curs.execute(\"INSERT INTO dataclient (guid, primary_region, failover_region, http_code,\
           \ insertedon) VALUES ('{}', 0, 0, 0, '{}');\".format(\n        str(guid),\n        datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\")\n    ))\n    \n    db_conn.commit()\n   \
@@ -129,13 +127,13 @@ Resources:
       Environment:
         Variables:
           FAILOVER_REGION_NAME: !Ref 'FailoverRegionName'
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
+          PRIMARY_REGION_NAME: !Ref 'PrimaryRegionName'
+          PUBLIC_FQDN: !Ref 'PublicFqdn'
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
-          PRIMARY_REGION_NAME: !Ref 'PrimaryRegionName'
-          PUBLIC_FQDN: !Ref 'PublicFqdn'
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'

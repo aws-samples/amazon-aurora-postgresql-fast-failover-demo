@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 31, 2024",
-  "Version": "v1.11"
+  "LastUpdated": "September 25, 2024",
+  "Version": "v2.11"
  },
  "Parameters": {
   "CodeDownloadUrl": {
@@ -134,9 +134,6 @@
    "Description": "The CIDR range you wish to use for your VPC.",
    "Type": "String"
   },
-  "PrivateHostedZoneId": {
-   "Type": "String"
-  },
   "PublicFqdn": {
    "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS record currently defined in the corresponding Route 53 Hosted Zone.",
    "Type": "String"
@@ -156,7 +153,7 @@
      "x86_64"
     ],
     "Code": {
-     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport uuid\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport urllib.request\nimport multi_region_db\nfrom botocore.vendored import requests\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    guid = uuid.uuid4()\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    \n    curs.execute(\"INSERT INTO dataclient (guid, primary_region, failover_region, http_code, insertedon) VALUES ('{}', 0, 0, 0, '{}');\".format(\n        str(guid),\n        datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\")\n    ))\n    \n    db_conn.commit()\n    \n    http_code = 200\n    http_content = ''\n\n    print('END guid: ' + str(guid))\n\n    try:\n        \n        res = urllib.request.urlopen(\n            urllib.request.Request(\n                url = 'https://' + os.environ['PUBLIC_FQDN'] + '?guid=' + str(guid),\n                method = 'GET',\n            ),\n            timeout = 5\n        )\n        \n        http_code = res.status\n        http_content = res.read().decode()\n        \n    except Exception as e:\n        http_code = 500\n        print('Client Web Request Failed :' + str(e))\n\n    try: \n\n        if http_code > 200:\n            http_content = ''\n            \n        curs = db_conn.cursor()\n        \n        curs.execute('''\n            UPDATE dataclient SET\n                primary_region  = {},\n                failover_region = {},\n                http_code       = {}\n            WHERE guid = '{}'\n        '''.format(\n            1 if http_content == os.environ['PRIMARY_REGION_NAME'] else 0,\n            1 if http_content == os.environ['FAILOVER_REGION_NAME'] else 0,\n            http_code,\n            str(guid)\n        ))\n        \n        db_conn.commit()\n        \n    except Exception as ex:\n        http_code = 500\n        print('Failed to Update Client Request: ' + str(ex) + ' - HTTP Content: \"' + http_content + '\"')\n    \n    curs.close()\n    db_conn.close()\n    \n    return True"
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport uuid\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport urllib.request\nimport multi_region_db\nfrom botocore.vendored import requests\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    guid = uuid.uuid4()\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    \n    curs.execute(\"INSERT INTO dataclient (guid, primary_region, failover_region, http_code, insertedon) VALUES ('{}', 0, 0, 0, '{}');\".format(\n        str(guid),\n        datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\")\n    ))\n    \n    db_conn.commit()\n    \n    http_code = 200\n    http_content = ''\n\n    print('END guid: ' + str(guid))\n\n    try:\n        \n        res = urllib.request.urlopen(\n            urllib.request.Request(\n                url = 'https://' + os.environ['PUBLIC_FQDN'] + '?guid=' + str(guid),\n                method = 'GET',\n            ),\n            timeout = 5\n        )\n        \n        http_code = res.status\n        http_content = res.read().decode()\n        \n    except Exception as e:\n        http_code = 500\n        print('Client Web Request Failed :' + str(e))\n\n    try: \n\n        if http_code > 200:\n            http_content = ''\n            \n        curs = db_conn.cursor()\n        \n        curs.execute('''\n            UPDATE dataclient SET\n                primary_region  = {},\n                failover_region = {},\n                http_code       = {}\n            WHERE guid = '{}'\n        '''.format(\n            1 if http_content == os.environ['PRIMARY_REGION_NAME'] else 0,\n            1 if http_content == os.environ['FAILOVER_REGION_NAME'] else 0,\n            http_code,\n            str(guid)\n        ))\n        \n        db_conn.commit()\n        \n    except Exception as ex:\n        http_code = 500\n        print('Failed to Update Client Request: ' + str(ex) + ' - HTTP Content: \"' + http_content + '\"')\n    \n    curs.close()\n    db_conn.close()\n    \n    return True"
     },
     "Description": "Emulates legitimate client traffic",
     "Environment": {
@@ -164,7 +161,13 @@
       "FAILOVER_REGION_NAME": {
        "Ref": "FailoverRegionName"
       },
-      "GLOBAL_DEMO_DB_WRITER_ENDPOINT": {
+      "PRIMARY_REGION_NAME": {
+       "Ref": "PrimaryRegionName"
+      },
+      "PUBLIC_FQDN": {
+       "Ref": "PublicFqdn"
+      },
+      "REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT": {
        "Fn::Join": [
         "",
         [
@@ -172,15 +175,9 @@
          {
           "Ref": "MainStackName"
          },
-         "/GlobalDemoDbWriterDnsEndpoint}}"
+         "/RegionalDemoDbClusterWriterEndpoint}}"
         ]
        ]
-      },
-      "PRIMARY_REGION_NAME": {
-       "Ref": "PrimaryRegionName"
-      },
-      "PUBLIC_FQDN": {
-       "Ref": "PublicFqdn"
       },
       "REGIONAL_DEMO_DB_SECRET_ARN": {
        "Fn::Join": [

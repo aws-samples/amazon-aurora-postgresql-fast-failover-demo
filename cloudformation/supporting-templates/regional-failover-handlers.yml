@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -93,8 +93,6 @@ Parameters:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
-  PrivateHostedZoneId:
-    Type: String
   PublicFqdn:
     Description: >-
       The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
@@ -104,62 +102,50 @@ Parameters:
     Description: The ID of the public Route 53 Hosted Zone corresponding to the public Service FQDN.
     Type: String
 Resources:
-  DatabaseCanary:
-    Condition: IsFailoverRegion
+  FailoverClusterPromoter:
+    Condition: IsPrimaryRegion
     DependsOn:
-      - DatabaseCanaryRole
+      - FailoverClusterPromoterRole
     Properties:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "_D='database'\n_C='password'\n_B='require'\n_A='username'\nimport sys\nsys.path.append('/opt')\nimport os,time,json,boto3,urllib,psycopg2,dateutil.tz,multi_region_db\nfrom datetime import\
-          \ datetime,timedelta\nfrom botocore.exceptions import ClientError as boto3_client_error\ncustom_functions=multi_region_db.Functions()\napp_db_credentials=custom_functions.get_db_credentials('App')\n\
-          def test_db_via_api():\n\tA=urllib.request.urlopen(urllib.request.Request(url='https://api.'+os.environ['PUBLIC_FQDN']+'/perform-health-check',method='GET'),timeout=5)\n\tif int(A.read())==500:raise\
-          \ Exception('Health Check Failed')\ndef test_db_connection():\n\tA=psycopg2.connect(host=os.environ['GLOBAL_APP_DB_WRITER_ENDPOINT'],port=app_db_credentials['port'],user=app_db_credentials[_A],sslmode=_B,password=app_db_credentials[_C],database=app_db_credentials[_D],connect_timeout=3)\n\
-          \twith A:\n\t\twith A.cursor()as B:B.execute('SELECT NOW()');C=B.fetchall();A.commit()\ndef disable_canary_rule():\n\tA='DATABASE_CANARY_CRON_NAME';print('Attempting to Disable Database Canary\
-          \ Cron: \"'+os.environ[A]+'\"')\n\ttry:boto3.client('events').disable_rule(Name=os.environ[A]);print('Successfully Disabled Database Canary Cron: \"'+os.environ[A]+'\"')\n\texcept boto3_client_error\
-          \ as B:raise Exception('Failed to Disable Database Canary Cron: '+str(B))\n\treturn True\ndef detach_and_promote_failover_cluster():\n\tE='\" from Global DB Cluster \"';B='REGIONAL_APP_DB_CLUSTER_ARN';A='GLOBAL_APP_DB_CLUSTER_IDENTIFIER';D=boto3.client('rds')\n\
-          \ttry:\n\t\tprint('Attempting to Retrieve Global DB Cluster Members: \"'+os.environ[A]+'\"');F=D.describe_global_clusters(GlobalClusterIdentifier=os.environ[A]);'\\n            For each Global\
-          \ Cluster member\\n        '\n\t\tfor G in F['GlobalClusters'][0]['GlobalClusterMembers']:\n\t\t\t'\\n                    If this failover cluster is a member of the Global Cluster\\n        \
-          \        '\n\t\t\tif os.environ[B]==G['DBClusterArn']:\n\t\t\t\ttry:print('Attempting to Detach Regional Cluster \"'+os.environ[B]+E+os.environ[A]+'\"');D.remove_from_global_cluster(DbClusterIdentifier=os.environ[B],GlobalClusterIdentifier=os.environ[A]);print('Successfully\
-          \ Detached Regional Cluster \"'+os.environ[B]+E+os.environ[A]+'\"')\n\t\t\t\texcept boto3_client_error as C:raise Exception('Failed to Detach Failover Cluster from Global Cluster: '+str(C))\n\t\
-          except boto3_client_error as C:raise Exception('Failed to Retrieve Global Cluster Members: '+str(C))\n\treturn True\ndef log_failover_event():A=custom_functions.get_db_credentials('Demo');B=psycopg2.connect(host=os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],port=A['port'],user=A[_A],sslmode=_B,password=A[_C],database=A[_D],connect_timeout=3);D=dateutil.tz.gettz('US/Eastern');C=B.cursor();C.execute(\"\
-          INSERT INTO failoverevents (event,insertedon) values (2,'\"+datetime.now(tz=D).strftime('%m/%d/%Y %H:%M:%S')+\"' )\");B.commit();C.close();B.close()\ndef handler(event,context):\n\tA=0;B=datetime.now()+timedelta(seconds=60)\n\
-          \twhile datetime.now()<B:\n\t\ttry:test_db_connection()\n\t\texcept Exception as C:A+=1;print('Failed to Establish DB Connection')\n\t\tif A>1:print('Connection Failure Tolerance Exceeded');detach_and_promote_failover_cluster();disable_canary_rule();log_failover_event();return\
-          \ False\n\t\ttime.sleep(10)\n\treturn True"
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\nfrom botocore.exceptions\
+          \ import ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef initiate_global_cluster_failover():\n    \n    rds_client = boto3.client('rds')\n    \n    try:\n\
+          \        \n        print('Attempting to Retrieve Global DB Cluster Members: \"' + os.environ['GLOBAL_APP_DB_CLUSTER_IDENTIFIER'] + '\"')\n            \n        describe_cluster_resp = rds_client.describe_global_clusters(\n\
+          \            GlobalClusterIdentifier = os.environ['GLOBAL_APP_DB_CLUSTER_IDENTIFIER']\n        )\n        \n        '''\n            For each Global Cluster member\n        '''\n        for cluster_member\
+          \ in describe_cluster_resp['GlobalClusters'][0]['GlobalClusterMembers']:\n            \n                '''\n                    If there's a member in the failover region\n                '''\n\
+          \                if os.environ['FAILOVER_REGION_NAME'] in cluster_member['DBClusterArn']:\n                    \n                    try:\n                        \n                        print('Attempting\
+          \ to Promote Regional Cluster \"' + cluster_member['DBClusterArn'] + '\" within Global DB Cluster \"' + os.environ['GLOBAL_APP_DB_CLUSTER_IDENTIFIER'] + '\"')\n                        \n     \
+          \                   rds_client.failover_global_cluster(\n                            GlobalClusterIdentifier = os.environ['GLOBAL_APP_DB_CLUSTER_IDENTIFIER'],\n                            TargetDbClusterIdentifier\
+          \ = cluster_member['DBClusterArn'],\n                            AllowDataLoss = True\n                        )\n                        \n                        print('Successfully Promoted\
+          \ Regional Cluster \"' + cluster_member['DBClusterArn'] + '\" within Global DB Cluster \"' + os.environ['GLOBAL_APP_DB_CLUSTER_IDENTIFIER'] + '\"')\n                    \n                    except\
+          \ boto3_client_error as e:\n                        raise Exception('Failed to Promote Regional Cluster within Global DB Cluster: ' + str(e))\n                \n    except boto3_client_error as\
+          \ e:\n        raise Exception('Failed to Retrieve Global Cluster Members: ' + str(e))\n                    \n    return True\n    \ndef log_failover_event():\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
+          \    \n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
+          \        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n    \n    eastern\
+          \ = dateutil.tz.gettz('US/Eastern')\n    \n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (2,'\" + datetime.now(tz = eastern).strftime(\"\
+          %m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n   \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    initiate_global_cluster_failover()\n\
+          \            \n    log_failover_event()"
       Description: ''
       Environment:
         Variables:
-          DATABASE_CANARY_CRON_NAME: !Join
-            - ''
-            - - !Ref 'MainStackName'
-              - -database-canary
+          FAILOVER_REGION_NAME: !Ref 'FailoverRegionName'
           GLOBAL_APP_DB_CLUSTER_IDENTIFIER: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /GlobalAppDbClusterIdentifier}}
-          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbWriterDnsEndpoint}}
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
-          PUBLIC_FQDN: !Ref 'PublicFqdn'
           REGIONAL_APP_DB_CLUSTER_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /RegionalAppDbClusterArn}}
-          REGIONAL_APP_DB_SECRET_ARN: !Join
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /RegionalAppDbAdminSecretArn}}
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -173,9 +159,9 @@ Resources:
             - !Ref 'MainStackName'
             - /RegionalLambdaLayerVersionArn}}
       MemorySize: 128
-      Role: !GetAtt 'DatabaseCanaryRole.Arn'
+      Role: !GetAtt 'FailoverClusterPromoterRole.Arn'
       Runtime: python3.11
-      Timeout: 65
+      Timeout: 15
       TracingConfig:
         Mode: PassThrough
       VpcConfig:
@@ -197,48 +183,30 @@ Resources:
               - !Ref 'MainStackName'
               - /PrivateSubnetZoneBId}}
     Type: AWS::Lambda::Function
-  DatabaseCanaryCron:
-    Condition: IsFailoverRegion
+  FailoverClusterPromoterEventsPermission:
+    Condition: IsPrimaryRegion
     DependsOn:
-      - DatabaseCanary
-    Properties:
-      Description: !Join
-        - ''
-        - - Invokes Regional DB Canary
-      Name: !Join
-        - ''
-        - - !Ref 'MainStackName'
-          - -database-canary
-      ScheduleExpression: rate(1 minute)
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt 'DatabaseCanary.Arn'
-          Id: DatabaseCanary
-    Type: AWS::Events::Rule
-  DatabaseCanaryCronPermission:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - DatabaseCanary
-      - DatabaseCanaryCron
+      - FailoverClusterPromoter
+      - WebsiteHealthCheckAlarmListener
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref 'DatabaseCanary'
+      FunctionName: !Ref 'FailoverClusterPromoter'
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt 'DatabaseCanaryCron.Arn'
+      SourceArn: !GetAtt 'WebsiteHealthCheckAlarmListener.Arn'
     Type: AWS::Lambda::Permission
-  DatabaseCanaryLogGroup:
-    Condition: IsFailoverRegion
+  FailoverClusterPromoterLogGroup:
+    Condition: IsPrimaryRegion
     DeletionPolicy: Delete
     DependsOn:
-      - DatabaseCanary
+      - FailoverClusterPromoter
     Properties:
       LogGroupName: !Join
         - ''
         - - /aws/lambda/
-          - !Ref 'DatabaseCanary'
+          - !Ref 'FailoverClusterPromoter'
       RetentionInDays: 30
     Type: AWS::Logs::LogGroup
-  DatabaseCanaryRole:
+  FailoverClusterPromoterRole:
     DependsOn: []
     Properties:
       AssumeRolePolicyDocument:
@@ -283,23 +251,8 @@ Resources:
                 Sid: DecryptWithKMS
               - Action:
                   - rds:DescribeGlobalClusters
-                  - rds:RemoveFromGlobalCluster
                 Effect: Allow
                 Resource:
-                  - !Join
-                    - ''
-                    - - 'arn:'
-                      - !Ref 'AWS::Partition'
-                      - ':rds:'
-                      - !Ref 'AWS::Region'
-                      - ':'
-                      - !Ref 'AWS::AccountId'
-                      - ':cluster:'
-                      - !Join
-                        - ''
-                        - - '{{resolve:ssm:/'
-                          - !Ref 'MainStackName'
-                          - /RegionalAppDbClusterIdentifier}}
                   - !Join
                     - ''
                     - - 'arn:'
@@ -312,27 +265,35 @@ Resources:
                         - - '{{resolve:ssm:/'
                           - !Ref 'MainStackName'
                           - /GlobalAppDbClusterIdentifier}}
-                Sid: DetachFailoverCluster
+                Sid: DescribeGlobalClusters
+              - Action:
+                  - rds:FailoverGlobalCluster
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ''
+                    - - 'arn:'
+                      - !Ref 'AWS::Partition'
+                      - ':rds:'
+                      - !Ref 'FailoverRegionName'
+                      - ':'
+                      - !Ref 'AWS::AccountId'
+                      - :cluster:*
+                  - !Join
+                    - ''
+                    - - 'arn:'
+                      - !Ref 'AWS::Partition'
+                      - ':rds::'
+                      - !Ref 'AWS::AccountId'
+                      - ':global-cluster:'
+                      - !Join
+                        - ''
+                        - - '{{resolve:ssm:/'
+                          - !Ref 'MainStackName'
+                          - /GlobalAppDbClusterIdentifier}}
+                Sid: PromoteFailoverCluster
           PolicyName: main-policy
     Type: AWS::IAM::Role
-  DatabaseCanaryRoleEventBridgePolicy:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - DatabaseCanaryRole
-      - DatabaseCanaryCron
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - events:DisableRule
-            Effect: Allow
-            Resource:
-              - !GetAtt 'DatabaseCanaryCron.Arn'
-            Sid: DisableEventBridgeRule
-      PolicyName: event-bridge-policy
-      Roles:
-        - !Ref 'DatabaseCanaryRole'
-    Type: AWS::IAM::Policy
   FailoverCompletedEventListener:
     DependsOn:
       - FailoverCompletedHandler
@@ -364,47 +325,32 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\nimport os,json,boto3,psycopg2,dateutil.tz,multi_region_db\nfrom datetime import datetime,timedelta\nfrom botocore.exceptions import ClientError as\
-          \ boto3_client_error\ncustom_functions=multi_region_db.Functions()\ndef enable_proxy_target_waiter_rule():\n\tA='PROXY_MONITOR_CRON_NAME';print('Attempting to Enable Proxy Target Waiter Cron:\
-          \ \"'+os.environ[A]+'\"')\n\ttry:boto3.client('events').enable_rule(Name=os.environ[A]);print('Successfully Enabled Proxy Target Waiter Cron: \"'+os.environ[A]+'\"')\n\texcept boto3_client_error\
-          \ as B:raise Exception('Failed to Enable Proxy Target Waiter Cron: '+str(B))\ndef point_service_fqdn_to_failover_web_alb():\n\ttry:boto3.client('route53').change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':os.environ['PUBLIC_FQDN'],'AliasTarget':{'DNSName':os.environ['REGIONAL_WEB_ALB_FQDN'],'HostedZoneId':os.environ['REGIONAL_WEB_ALB_HOSTED_ZONE_ID'],'EvaluateTargetHealth':False},'Type':'A'}}]},HostedZoneId=os.environ['PUBLIC_HOSTED_ZONE_ID'])\n\
-          \texcept boto3_client_error as A:raise Exception('Failed to Update ALB DNS Record: '+str(A))\ndef register_failover_cluster_as_proxy_target():\n\ttry:boto3.client('rds').register_db_proxy_targets(DBProxyName=os.environ['REGIONAL_APP_DB_PROXY_NAME'],TargetGroupName='default',DBClusterIdentifiers=[os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']])\n\
-          \texcept boto3_client_error as A:raise Exception('Failed to Register Failover Cluster as Proxy Target: '+str(A))\ndef handler(event,context):\n\tM='PRIVATE_HOSTED_ZONE_ID';L=\"INSERT INTO failoverevents\
-          \ (event,insertedon) values (3,'\";J='hostedZoneId';I='newValue';H='fqdn';G=\"' )\";F='%m/%d/%Y %H:%M:%S';print(json.dumps(event));D=dateutil.tz.gettz('US/Eastern');C=custom_functions.get_db_credentials('Demo');A=psycopg2.connect(host=os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],port=C['port'],user=C['username'],password=C['password'],database=C['database'],connect_timeout=3,sslmode='require');K=os.environ['AWS_REGION']\n\
-          \tif K==os.environ['PRIMARY_REGION_NAME']:B=A.cursor();B.execute(L+datetime.now(tz=D).strftime(F)+G);A.commit()\n\telif K==os.environ['FAILOVER_REGION_NAME']:\n\t\tN=[{H:os.environ['GLOBAL_APP_DB_WRITER_ENDPOINT'],I:os.environ['REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT'],J:os.environ[M]},{H:os.environ['GLOBAL_APP_DB_READER_ENDPOINT'],I:os.environ['REGIONAL_APP_DB_CLUSTER_READER_ENDPOINT'],J:os.environ[M]}]\n\
-          \t\tfor E in N:custom_functions.update_dns_record(fqdn=E[H],new_value=E[I],hosted_zone_id=E[J])\n\t\tenable_proxy_target_waiter_rule();point_service_fqdn_to_failover_web_alb();register_failover_cluster_as_proxy_target()\n\
-          \t'\\n        Logs CNAME Update\\n    ';B=A.cursor();B.execute(\"INSERT INTO failoverevents (event,insertedon) values (4,'\"+datetime.now(tz=D).strftime(F)+G);A.commit();'\\n        Logs Failover\
-          \ Completion\\n    ';B=A.cursor();B.execute(L+datetime.now(tz=D).strftime(F)+G);A.commit();B.close();A.close();return True"
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\nfrom datetime import\
+          \ timedelta\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef enable_proxy_target_waiter_rule():\n    \n    print('Attempting\
+          \ to Enable Proxy Target Waiter Cron: \"' + os.environ['PROXY_MONITOR_CRON_NAME'] + '\"')\n\n    try:\n        \n        boto3.client('events').enable_rule(\n            Name = os.environ['PROXY_MONITOR_CRON_NAME']\n\
+          \        )\n        \n        print('Successfully Enabled Proxy Target Waiter Cron: \"' + os.environ['PROXY_MONITOR_CRON_NAME'] + '\"')\n        \n    except boto3_client_error as e:\n       \
+          \ raise Exception('Failed to Enable Proxy Target Waiter Cron: ' + str(e))\n    \ndef point_service_fqdn_to_failover_web_alb():\n    \n    try:\n\n        boto3.client('route53').change_resource_record_sets(\n\
+          \            ChangeBatch = {\n                'Changes': [\n                    {\n                        'Action': 'UPSERT',\n                        'ResourceRecordSet': {\n               \
+          \             'Name': os.environ['PUBLIC_FQDN'],\n                            'AliasTarget': {\n                                'DNSName': os.environ['REGIONAL_WEB_ALB_FQDN'],\n              \
+          \                  'HostedZoneId': os.environ['REGIONAL_WEB_ALB_HOSTED_ZONE_ID'],\n                                'EvaluateTargetHealth': False\n                            },\n             \
+          \               'Type': 'A'\n                        },\n                    },\n                ],\n            },\n            HostedZoneId = os.environ['PUBLIC_HOSTED_ZONE_ID'],\n        )\n\
+          \        \n    except boto3_client_error as e:\n        raise Exception('Failed to Update ALB DNS Record: ' + str(e))\n\ndef register_failover_cluster_as_proxy_target():\n    \n    try:\n    \
+          \    \n        boto3.client('rds').register_db_proxy_targets(\n            DBProxyName             = os.environ['REGIONAL_APP_DB_PROXY_NAME'],\n            TargetGroupName         = 'default',\n\
+          \            DBClusterIdentifiers    = [\n                os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n            ]\n        )\n    \n    except boto3_client_error as e:\n        raise Exception('Failed\
+          \ to Register Failover Cluster as Proxy Target: ' + str(e))\n        \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n \
+          \   \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n       \
+          \ port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
+          \        connect_timeout = 3,\n        sslmode = 'require',\n    )\n    \n    current_region = os.environ['AWS_REGION']\n    \n    if current_region == os.environ['PRIMARY_REGION_NAME']:\n   \
+          \     \n        curs = db_conn.cursor()\n        curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (3,'\" + datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\"\
+          )\n        db_conn.commit()\n        \n    elif current_region == os.environ['FAILOVER_REGION_NAME']:\n        \n        point_service_fqdn_to_failover_web_alb()\n      \n    '''\n        Logs\
+          \ CNAME Update\n    '''\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (4,'\" + datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\"\
+          ) + \"' )\")\n    db_conn.commit()\n    \n    '''\n        Logs Failover Completion\n    '''\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values\
+          \ (3,'\" + datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n        \n    curs.close()\n    db_conn.close()\n    \n    return True"
       Description: Processes failover completed events
       Environment:
         Variables:
           FAILOVER_REGION_NAME: !Ref 'FailoverRegionName'
-          GLOBAL_APP_DB_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbReaderDnsEndpoint}}
-          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbWriterDnsEndpoint}}
-          GLOBAL_DEMO_DB_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbReaderDnsEndpoint}}
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
           PRIMARY_REGION_NAME: !Ref 'PrimaryRegionName'
-          PRIVATE_HOSTED_ZONE_ID: !Ref 'PrivateHostedZoneId'
-          PROXY_MONITOR_CRON_NAME: !Join
-            - ''
-            - - !Ref 'MainStackName'
-              - -database-proxy-monitor
           PUBLIC_FQDN: !Ref 'PublicFqdn'
           PUBLIC_HOSTED_ZONE_ID: !Ref 'PublicHostedZoneId'
           REGIONAL_APP_DB_CLUSTER_IDENTIFIER: !Join
@@ -433,6 +379,11 @@ Resources:
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /RegionalAppDbAdminSecretArn}}
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -555,58 +506,9 @@ Resources:
                     - ''
                     - - arn:aws:route53:::hostedzone/
                       - !Ref 'PublicHostedZoneId'
-                  - !Join
-                    - ''
-                    - - arn:aws:route53:::hostedzone/
-                      - !Ref 'PrivateHostedZoneId'
                 Sid: UpdateRoute53Records
           PolicyName: update-route53-records
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - rds:RegisterDBProxyTargets
-                Effect: Allow
-                Resource:
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalAppDbProxyArn}}
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalAppDbClusterArn}}
-                  - !Join
-                    - ':'
-                    - - arn
-                      - !Ref 'AWS::Partition'
-                      - rds
-                      - !Ref 'AWS::Region'
-                      - !Ref 'AWS::AccountId'
-                      - target-group
-                      - '*'
-                Sid: RegisterProxyTargets
-          PolicyName: register-proxy-targets
     Type: AWS::IAM::Role
-  FailoverCompletedHandlerRoleEnableEventBrdigeRule:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - FailoverCompletedHandlerRole
-      - RdsProxyMonitorCron
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - events:EnableRule
-            Effect: Allow
-            Resource:
-              - !GetAtt 'RdsProxyMonitorCron.Arn'
-            Sid: DisableEventBridgeRule
-      PolicyName: enable-event-brdige-rule
-      Roles:
-        - !Ref 'FailoverCompletedHandlerRole'
-    Type: AWS::IAM::Policy
   FailoverStartedEventListener:
     DependsOn:
       - FailoverStartedHandler
@@ -640,40 +542,15 @@ Resources:
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport multi_region_db\nfrom botocore.exceptions import\
           \ ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n\
-          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n\
-          \        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n     \
-          \   sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (2,'\" + datetime.datetime.now(tz = eastern).strftime(\"\
-          %m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \n    return True"
+          \    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n      \
+          \  port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
+          \        connect_timeout = 3,\n        sslmode = 'require',\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (2,'\" + datetime.datetime.now(tz\
+          \ = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \n    return True"
       Description: Processes failover started events
       Environment:
         Variables:
           FAILOVER_REGION_NAME: !Ref 'FailoverRegionName'
-          GLOBAL_APP_DB_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbReaderDnsEndpoint}}
-          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbWriterDnsEndpoint}}
-          GLOBAL_DEMO_DB_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbReaderDnsEndpoint}}
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
           PRIMARY_REGION_NAME: !Ref 'PrimaryRegionName'
-          PRIVATE_HOSTED_ZONE_ID: !Ref 'PrivateHostedZoneId'
-          PROXY_MONITOR_CRON_NAME: !Join
-            - ''
-            - - !Ref 'MainStackName'
-              - -database-proxy-monitor
           PUBLIC_FQDN: !Ref 'PublicFqdn'
           PUBLIC_HOSTED_ZONE_ID: !Ref 'PublicHostedZoneId'
           REGIONAL_APP_DB_CLUSTER_IDENTIFIER: !Join
@@ -702,6 +579,11 @@ Resources:
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /RegionalAppDbAdminSecretArn}}
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -824,314 +706,65 @@ Resources:
                     - ''
                     - - arn:aws:route53:::hostedzone/
                       - !Ref 'PublicHostedZoneId'
-                  - !Join
-                    - ''
-                    - - arn:aws:route53:::hostedzone/
-                      - !Ref 'PrivateHostedZoneId'
                 Sid: UpdateRoute53Records
           PolicyName: update-route53-records
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - rds:RegisterDBProxyTargets
-                Effect: Allow
-                Resource:
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalAppDbProxyArn}}
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalAppDbClusterArn}}
-                  - !Join
-                    - ':'
-                    - - arn
-                      - !Ref 'AWS::Partition'
-                      - rds
-                      - !Ref 'AWS::Region'
-                      - !Ref 'AWS::AccountId'
-                      - target-group
-                      - '*'
-                Sid: RegisterProxyTargets
-          PolicyName: register-proxy-targets
     Type: AWS::IAM::Role
-  FailoverStartedHandlerRoleEnableEventBrdigeRule:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - FailoverStartedHandlerRole
-      - RdsProxyMonitorCron
+  WebsiteHealthCheck:
+    Condition: IsPrimaryRegion
     Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - events:EnableRule
-            Effect: Allow
-            Resource:
-              - !GetAtt 'RdsProxyMonitorCron.Arn'
-            Sid: DisableEventBridgeRule
-      PolicyName: enable-event-brdige-rule
-      Roles:
-        - !Ref 'FailoverStartedHandlerRole'
-    Type: AWS::IAM::Policy
-  RdsProxyMonitor:
-    Condition: IsFailoverRegion
+      HealthCheckConfig:
+        EnableSNI: false
+        FailureThreshold: '1'
+        FullyQualifiedDomainName: !Ref 'PublicFqdn'
+        Inverted: false
+        MeasureLatency: false
+        Port: 443
+        RequestInterval: '10'
+        ResourcePath: ''
+        Type: HTTPS
+    Type: AWS::Route53::HealthCheck
+  WebsiteHealthCheckAlarm:
+    Condition: IsPrimaryRegion
     DependsOn:
-      - RdsProxyMonitorRole
+      - WebsiteHealthCheck
     Properties:
-      Architectures:
-        - x86_64
-      Code:
-        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport time\nimport boto3\nimport psycopg2\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\nfrom\
-          \ datetime import timedelta\nfrom botocore.exceptions import ClientError as boto3_client_error\n\nrds_client = boto3.client('rds')\n\ncustom_functions = multi_region_db.Functions()\n\ndef disable_proxy_monitor_cron():\n\
-          \    \n    print('Attempting to Disable Proxy Monitor Cron: \"' + os.environ['PROXY_MONITOR_CRON_NAME'] + '\"')\n    \n    try:\n        \n        boto3.client('events').disable_rule(\n      \
-          \      Name = os.environ['PROXY_MONITOR_CRON_NAME']\n        )\n        \n        print('Successfully Disabled Proxy Monitor Cron: \"' + os.environ['PROXY_MONITOR_CRON_NAME'] + '\"')\n       \
-          \ \n    except boto3_client_error as e:\n        raise Exception('Failed to Disable Proxy Monitor Cron: ' + str(e))\n        \n    return True\n\ndef is_rds_proxy_target_available():\n    \n \
-          \   print('Attempting to Retrieve Proxy Target Status for Proxy: \"' + os.environ['REGIONAL_APP_DB_PROXY_NAME'] + '\"')\n    \n    try:\n        \n        describe_proxy_targets_resp = rds_client.describe_db_proxy_targets(\n\
-          \            DBProxyName = os.environ['REGIONAL_APP_DB_PROXY_NAME'], \n            TargetGroupName = 'default'\n        )\n        \n        print('Successfully Retrieved Proxy Target Status for\
-          \ Proxy: \"' + os.environ['REGIONAL_APP_DB_PROXY_NAME'] + '\"')\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Retrieve Proxy Target Status: ' + str(e))\n \
-          \   \n    print(describe_proxy_targets_resp)\n    \n    if \"'State': 'AVAILABLE'\" in str(describe_proxy_targets_resp):\n        return True\n    \n    else:\n        return False\n        \n\
-          def point_global_app_db_endpoints_to_failover_proxy():\n    \n    r53_client = boto3.client('route53')\n        \n    for endpoint_type in ['READER', 'WRITER']:\n        \n        custom_functions.update_dns_record(\n\
-          \            fqdn            = os.environ['GLOBAL_APP_DB_' + endpoint_type + '_ENDPOINT'],\n            new_value       = os.environ['REGIONAL_APP_DB_PROXY_' + endpoint_type + '_ENDPOINT'],\n\
-          \            hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],\n        )\n        \n    return True\n\ndef log_event():\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n    \n    demo_db_credentials\
-          \ = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n\
-          \        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n     \
-          \   connect_timeout = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event,insertedon) values (5,'\" + datetime.now(tz = eastern).strftime(\"%m/%d/%Y\
-          \ %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n\ndef handler(event, context):\n    \n    now = datetime.now()\n    end = now + timedelta(seconds =\
-          \ 50)\n    \n    while (datetime.now() < end):\n        \n        try:\n        \n            if is_rds_proxy_target_available():\n                \n                print('Target is Registered\
-          \ and Available')\n                \n                log_event()\n                \n                disable_proxy_monitor_cron()\n                \n                point_global_app_db_endpoints_to_failover_proxy()\n\
-          \                \n                break;\n                \n            else:\n                print('Target is NOT Registered and Available')\n                \n        except Exception as e:\n\
-          \            print(str(e))\n            time.sleep(10)"
-      Description: ''
-      Environment:
-        Variables:
-          GLOBAL_APP_DB_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbReaderDnsEndpoint}}
-          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbWriterDnsEndpoint}}
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
-          PRIVATE_HOSTED_ZONE_ID: !Ref 'PrivateHostedZoneId'
-          PROXY_MONITOR_CRON_NAME: !Join
-            - ''
-            - - !Ref 'MainStackName'
-              - -database-proxy-monitor
-          REGIONAL_APP_DB_PROXY_NAME: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /
-              - RegionalAppDbProxyName}}
-          REGIONAL_APP_DB_PROXY_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /
-              - RegionalAppDbProxyReaderEndpoint}}
-          REGIONAL_APP_DB_PROXY_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /
-              - RegionalAppDbProxyWriterEndpoint}}
-          REGIONAL_DEMO_DB_SECRET_ARN: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /RegionalDemoDbAdminSecretArn}}
-      Handler: index.handler
-      Layers:
-        - !Join
-          - ''
-          - - '{{resolve:ssm:/'
-            - !Ref 'MainStackName'
-            - /RegionalLambdaLayerVersionArn}}
-      MemorySize: 128
-      Role: !GetAtt 'RdsProxyMonitorRole.Arn'
-      Runtime: python3.11
-      Timeout: 120
-      TracingConfig:
-        Mode: PassThrough
-      VpcConfig:
-        SecurityGroupIds:
-          - !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /LambdaSecurityGroupId}}
-        SubnetIds:
-          - !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /PrivateSubnetZoneAId}}
-          - !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /PrivateSubnetZoneBId}}
-    Type: AWS::Lambda::Function
-  RdsProxyMonitorCron:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - RdsProxyMonitor
-    Properties:
-      Description: !Join
+      ActionsEnabled: true
+      AlarmDescription: !Join
         - ''
-        - - Invokes the RDS Proxy Monitor
-      Name: !Join
-        - ''
-        - - !Ref 'MainStackName'
-          - -database-proxy-monitor
-      ScheduleExpression: rate(1 minute)
-      State: DISABLED
+        - - 'Alerts when '
+          - !Ref 'PublicFqdn'
+          - ' is unavailable.'
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+        - Name: HealthCheckId
+          Value: !Ref 'WebsiteHealthCheck'
+      EvaluationPeriods: 1
+      MetricName: HealthCheckStatus
+      Namespace: AWS/Route53
+      Period: 10
+      Statistic: Sum
+      Threshold: '0'
+      TreatMissingData: ignore
+    Type: AWS::CloudWatch::Alarm
+  WebsiteHealthCheckAlarmListener:
+    Condition: IsPrimaryRegion
+    DependsOn:
+      - FailoverClusterPromoter
+    Properties:
+      Description: Invokes Handler When Failure is Detected
+      EventPattern:
+        detail:
+          state:
+            value:
+              - ALARM
+        detail-type:
+          - CloudWatch Alarm State Change
+        resources:
+          - !GetAtt 'WebsiteHealthCheckAlarm.Arn'
+        source:
+          - aws.cloudwatch
+      State: ENABLED
       Targets:
-        - Arn: !GetAtt 'RdsProxyMonitor.Arn'
-          Id: RdsProxyMonitor
+        - Arn: !GetAtt 'FailoverClusterPromoter.Arn'
+          Id: FailoverClusterPromoter
     Type: AWS::Events::Rule
-  RdsProxyMonitorCronPermission:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - RdsProxyMonitor
-      - RdsProxyMonitorCron
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref 'RdsProxyMonitor'
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt 'RdsProxyMonitorCron.Arn'
-    Type: AWS::Lambda::Permission
-  RdsProxyMonitorLogGroup:
-    Condition: IsFailoverRegion
-    DeletionPolicy: Delete
-    DependsOn:
-      - RdsProxyMonitor
-    Properties:
-      LogGroupName: !Join
-        - ''
-        - - /aws/lambda/
-          - !Ref 'RdsProxyMonitor'
-      RetentionInDays: 30
-    Type: AWS::Logs::LogGroup
-  RdsProxyMonitorRole:
-    DependsOn: []
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-      MaxSessionDuration: 3600
-      Policies:
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - secretsmanager:GetSecretValue
-                Effect: Allow
-                Resource:
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalAppDbAdminSecretArn}}
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalDemoDbAdminSecretArn}}
-                Sid: GetRDSAdminSecret
-              - Action:
-                  - kms:Decrypt
-                Effect: Allow
-                Resource:
-                  - !Join
-                    - ''
-                    - - '{{resolve:ssm:/'
-                      - !Ref 'MainStackName'
-                      - /RegionalKmsKeyArn}}
-                Sid: DecryptWithKMS
-          PolicyName: database-secret-retrieval
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - rds:DescribeDBProxyTargets
-                Effect: Allow
-                Resource:
-                  - !Join
-                    - ''
-                    - - 'arn:aws:rds:'
-                      - !Ref 'AWS::Region'
-                      - ':'
-                      - !Ref 'AWS::AccountId'
-                      - ':db:'
-                      - '*'
-                  - !Join
-                    - ''
-                    - - 'arn:aws:rds:'
-                      - !Ref 'AWS::Region'
-                      - ':'
-                      - !Ref 'AWS::AccountId'
-                      - ':cluster:'
-                      - '*'
-                  - !Join
-                    - ''
-                    - - 'arn:aws:rds:'
-                      - !Ref 'AWS::Region'
-                      - ':'
-                      - !Ref 'AWS::AccountId'
-                      - ':db-proxy:'
-                      - '*'
-                  - !Join
-                    - ''
-                    - - 'arn:aws:rds:'
-                      - !Ref 'AWS::Region'
-                      - ':'
-                      - !Ref 'AWS::AccountId'
-                      - ':target-group:'
-                      - '*'
-                Sid: DescribeDBProxyTargets
-              - Action:
-                  - route53:ChangeResourceRecordSets
-                Effect: Allow
-                Resource:
-                  - !Join
-                    - ''
-                    - - arn:aws:route53:::hostedzone/
-                      - !Ref 'PrivateHostedZoneId'
-                Sid: SendMessagesToSNS
-          PolicyName: main-policy
-    Type: AWS::IAM::Role
-  RdsProxyMonitorRoleEventBridgePolicy:
-    Condition: IsFailoverRegion
-    DependsOn:
-      - RdsProxyMonitorRole
-      - RdsProxyMonitorCron
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - events:DisableRule
-            Effect: Allow
-            Resource:
-              - !GetAtt 'RdsProxyMonitorCron.Arn'
-            Sid: DisableEventBridgeRule
-      PolicyName: event-bridge-policy
-      Roles:
-        - !Ref 'RdsProxyMonitorRole'
-    Type: AWS::IAM::Policy

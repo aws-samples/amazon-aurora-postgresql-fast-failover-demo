@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Parameters:
   CodeDownloadUrl:
     Default: https://codeload.github.com/aws-samples/amazon-aurora-postgresql-fast-failover-demo/zip/refs/heads/main
@@ -93,8 +93,6 @@ Parameters:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
-  PrivateHostedZoneId:
-    Type: String
   PublicFqdn:
     Description: >-
       The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
@@ -112,7 +110,7 @@ Resources:
         - x86_64
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n        \ndef handler(event, context):\n\
-          \    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n\
+          \    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n\
           \        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n\
           \        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    curs.execute('''\n        SELECT\n            insertedon,\n            sum(CASE WHEN\
           \ http_code = 200 THEN 0 ELSE 1 END)\n        FROM dataclient\n        WHERE http_code != 0\n        GROUP BY insertedon\n        ORDER BY insertedon DESC\n        LIMIT 15\n    ''');\n    client_errors\
@@ -125,11 +123,11 @@ Resources:
       Description: Retrieves client errors from the database
       Environment:
         Variables:
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -424,7 +422,7 @@ Resources:
       Code:
         ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\t\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\t\nfrom datetime import timedelta\n\
           \ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\
-          \    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
+          \    \n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n\
           \        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n    \n    if event['queryParams']['region']\
           \ not in ['primary', 'failover']:\n        raise Exception('Invalid Region Specified')\n        \n    curs = db_conn.cursor()\t\n    \n    curs.execute('''\n        SELECT\n            insertedon,\n\
           \            sum(CASE WHEN http_code = 200 AND {}_region = 1 THEN 1 ELSE 0 END)\n        FROM dataclient\n        WHERE http_code != 0\n        GROUP BY insertedon\n        ORDER BY insertedon\n\
@@ -439,11 +437,11 @@ Resources:
       Description: Retrieves client traffic logs from the database
       Environment:
         Variables:
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
             - ''
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -737,17 +735,22 @@ Resources:
       Architectures:
         - x86_64
       Code:
-        ZipFile: "_F='PRIVATE_HOSTED_ZONE_ID'\n_E='WRITER'\n_D='READER'\n_C='PUBLIC_FQDN'\n_B='_ENDPOINT'\n_A=True\nimport sys\nsys.path.append('/opt')\nimport os,json,boto3,psycopg2,dateutil.tz,multi_region_db\n\
-          from datetime import datetime\nfrom botocore.exceptions import ClientError as boto3_client_error\ncustom_functions=multi_region_db.Functions()\nevent_bridge_client=ec2_client=boto3.client('events',region_name=os.environ['FAILOVER_REGION_NAME'])\n\
-          def point_service_fqdn_to_primary_web_alb():\n\tA=boto3.client('route53')\n\ttry:A.change_resource_record_sets(ChangeBatch={'Changes':[{'Action':'UPSERT','ResourceRecordSet':{'Name':os.environ[_C],'AliasTarget':{'DNSName':os.environ['REGIONAL_WEB_ALB_FQDN'],'HostedZoneId':os.environ['REGIONAL_WEB_ALB_HOSTED_ZONE_ID'],'EvaluateTargetHealth':False},'Type':'A'}}]},HostedZoneId=os.environ['PUBLIC_HOSTED_ZONE_ID'])\n\
-          \texcept boto3_client_error as B:raise Exception('Failed to Update DNS Record: '+str(B))\n\treturn _A\ndef point_global_app_db_endpoints_to_primary_proxy():\n\tfor A in[_D,_E]:custom_functions.update_dns_record(fqdn=os.environ['GLOBAL_APP_DB_'+A+_B],new_value=os.environ['REGIONAL_APP_DB_PROXY_'+A+_B],hosted_zone_id=os.environ[_F])\n\
-          def point_global_app_db_cluster_endpoints_to_primary_cluster():\n\tfor A in[_D,_E]:custom_functions.update_dns_record(fqdn='db.cluster.'+A+'.'+os.environ[_C]+'.internal',new_value=os.environ['REGIONAL_APP_DB_CLUSTER_'+A+_B],hosted_zone_id=os.environ[_F])\n\
-          def allow_traffic_to_primary_db_cluster():\n\tA=boto3.client('ec2')\n\ttry:A.replace_network_acl_entry(Egress=False,Protocol='-1',CidrBlock='0.0.0.0/0',RuleAction='allow',RuleNumber=100,NetworkAclId=os.environ['REGIONAL_APP_DB_NACL_ID'])\n\
-          \texcept boto3_client_error as B:raise Exception('Failed to Reset NACL: '+str(B))\ndef prune_db_tables(db_identifier,table_names):\n\tC=db_identifier;A=custom_functions.get_db_credentials(C);B=psycopg2.connect(host=os.environ['GLOBAL_'+C.upper()+'_DB_WRITER_ENDPOINT'],port=A['port'],user=A['username'],sslmode='require',password=A['password'],database=A['database'],connect_timeout=3)\n\
-          \tfor E in table_names:D=B.cursor();D.execute('DELETE FROM '+E);B.commit()\n\tD.close();B.close();return _A\ndef disable_proxy_monitor_rule():\n\ttry:event_bridge_client.disable_rule(Name=os.environ['PROXY_MONITOR_CRON_NAME'])\n\
-          \texcept boto3_client_error as A:raise Exception('Failed to Disable Proxy Monitor Rule: '+str(A))\n\treturn _A\ndef enable_database_canary_rule():\n\ttry:event_bridge_client.enable_rule(Name=os.environ['DATABASE_CANARY_CRON_NAME'])\n\
-          \texcept boto3_client_error as A:raise Exception('Failed to Enable Database Canary Rule: '+str(A))\n\treturn _A\n'\\n    It is expected that this function will be run in the PRIMARY AWS region\\\
-          n'\ndef handler(event,context):allow_traffic_to_primary_db_cluster();prune_db_tables('App',['dataserver']);prune_db_tables('Demo',['dataclient','failoverevents']);disable_proxy_monitor_rule();enable_database_canary_rule();point_service_fqdn_to_primary_web_alb();point_global_app_db_endpoints_to_primary_proxy();point_global_app_db_cluster_endpoints_to_primary_cluster();return{'code':200,'body':json.dumps([])}"
+        ZipFile: "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport dateutil.tz\nimport multi_region_db\nfrom datetime import datetime\nfrom botocore.exceptions\
+          \ import ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\nevent_bridge_client = ec2_client = boto3.client('events', \n    region_name = os.environ['FAILOVER_REGION_NAME']\n\
+          )\n\ndef point_service_fqdn_to_primary_web_alb():\n    \n    r53_client = boto3.client('route53')\n        \n    try:\n        \n        r53_client.change_resource_record_sets(\n            ChangeBatch\
+          \ = {\n                'Changes': [\n                    {\n                        'Action': 'UPSERT',\n                        'ResourceRecordSet': {\n                            'Name': os.environ['PUBLIC_FQDN'],\n\
+          \                            'AliasTarget': {\n                                'DNSName': os.environ['REGIONAL_WEB_ALB_FQDN'],\n                                'HostedZoneId': os.environ['REGIONAL_WEB_ALB_HOSTED_ZONE_ID'],\n\
+          \                                'EvaluateTargetHealth': False\n                            },\n                            'Type': 'A'\n                        },\n                    },\n  \
+          \              ],\n            },\n            HostedZoneId = os.environ['PUBLIC_HOSTED_ZONE_ID'],\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to\
+          \ Update DNS Record: ' + str(e))\n    \n    return True\n\ndef allow_traffic_to_primary_db_cluster():\n    \n    ec2_client = boto3.client('ec2')\n    \n    try:\n        \n        ec2_client.replace_network_acl_entry(\n\
+          \            Egress = False, \n            Protocol = '-1',\n            CidrBlock = '0.0.0.0/0',\n            RuleAction = 'allow',\n            RuleNumber = 100,\n            NetworkAclId =\
+          \ os.environ['REGIONAL_APP_DB_NACL_ID'],\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Reset NACL: ' + str(e))\n\ndef prune_db_tables(db_identifier,\
+          \ table_names):\n    \n    db_credentials = custom_functions.get_db_credentials(db_identifier)\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_' + db_identifier.upper()\
+          \ + '_DB_CLUSTER_WRITER_ENDPOINT'],\n        port = db_credentials['port'],\n        user = db_credentials['username'],\n        sslmode = 'require',\n        password = db_credentials['password'],\n\
+          \        database = db_credentials['database'],\n        connect_timeout = 3,\n    )\n    \n    for table_to_prune in table_names:\n        \n        curs = db_conn.cursor()\n        curs.execute('DELETE\
+          \ FROM ' + table_to_prune)\n        db_conn.commit()\n        \n    curs.close()\n    db_conn.close()\n    \n    return True\n\n'''\n    It is expected that this function will be run in the PRIMARY\
+          \ AWS region\n'''\ndef handler(event, context):\n    \n    allow_traffic_to_primary_db_cluster()\n    \n    prune_db_tables('App', ['dataserver'])\n    prune_db_tables('Demo', ['dataclient', 'failoverevents'])\n\
+          \    \n    point_service_fqdn_to_primary_web_alb()\n    \n    return {\n        'code': 200,\n        'body': json.dumps([])\n    }"
       Description: Resets the demo environment
       Environment:
         Variables:
@@ -756,26 +759,6 @@ Resources:
             - - !Ref 'MainStackName'
               - -database-canary
           FAILOVER_REGION_NAME: !Ref 'FailoverRegionName'
-          GLOBAL_APP_DB_READER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbReaderDnsEndpoint}}
-          GLOBAL_APP_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalAppDbWriterDnsEndpoint}}
-          GLOBAL_DEMO_DB_WRITER_ENDPOINT: !Join
-            - ''
-            - - '{{resolve:ssm:/'
-              - !Ref 'MainStackName'
-              - /GlobalDemoDbWriterDnsEndpoint}}
-          PRIVATE_HOSTED_ZONE_ID: !Ref 'PrivateHostedZoneId'
-          PROXY_MONITOR_CRON_NAME: !Join
-            - ''
-            - - !Ref 'MainStackName'
-              - -database-proxy-monitor
           PUBLIC_FQDN: !Ref 'PublicFqdn'
           PUBLIC_HOSTED_ZONE_ID: !Ref 'PublicHostedZoneId'
           REGIONAL_APP_DB_CLUSTER_READER_ENDPOINT: !Join
@@ -810,6 +793,11 @@ Resources:
             - - '{{resolve:ssm:/'
               - !Ref 'MainStackName'
               - /RegionalAppDbAdminSecretArn}}
+          REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT: !Join
+            - ''
+            - - '{{resolve:ssm:/'
+              - !Ref 'MainStackName'
+              - /RegionalDemoDbClusterWriterEndpoint}}
           REGIONAL_DEMO_DB_SECRET_ARN: !Join
             - ''
             - - '{{resolve:ssm:/'
@@ -1161,10 +1149,6 @@ Resources:
                     - ''
                     - - arn:aws:route53:::hostedzone/
                       - !Ref 'PublicHostedZoneId'
-                  - !Join
-                    - ''
-                    - - arn:aws:route53:::hostedzone/
-                      - !Ref 'PrivateHostedZoneId'
                 Sid: UpdateR53HostedZone
           PolicyName: custom-policy
     Type: AWS::IAM::Role

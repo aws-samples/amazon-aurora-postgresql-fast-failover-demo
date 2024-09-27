@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Outputs:
   GlobalAppDbClusterIdentifier:
     Condition: ''
@@ -24,22 +24,6 @@ Outputs:
         - - !Ref 'MainStackName'
           - GlobalAppDbClusterIdentifier
     Value: !Ref 'GlobalAppCluster'
-  GlobalAppDbReaderDnsEndpoint:
-    Condition: ''
-    Value: !Join
-      - ''
-      - - app
-        - .db.reader.
-        - !Ref 'PublicFqdn'
-        - .internal
-  GlobalAppDbWriterDnsEndpoint:
-    Condition: ''
-    Value: !Join
-      - ''
-      - - app
-        - .db.writer.
-        - !Ref 'PublicFqdn'
-        - .internal
   GlobalDemoDbClusterIdentifier:
     Condition: ''
     Export:
@@ -48,22 +32,6 @@ Outputs:
         - - !Ref 'MainStackName'
           - GlobalDemoDbClusterIdentifier
     Value: !Ref 'GlobalDemoCluster'
-  GlobalDemoDbReaderDnsEndpoint:
-    Condition: ''
-    Value: !Join
-      - ''
-      - - demo
-        - .db.reader.
-        - !Ref 'PublicFqdn'
-        - .internal
-  GlobalDemoDbWriterDnsEndpoint:
-    Condition: ''
-    Value: !Join
-      - ''
-      - - demo
-        - .db.writer.
-        - !Ref 'PublicFqdn'
-        - .internal
   RegionalAppDbAdminSecretArn:
     Condition: ''
     Export:
@@ -80,9 +48,19 @@ Outputs:
     Value: !Ref 'PrimaryAppCluster'
   RegionalAppDbClusterReaderEndpoint:
     Condition: ''
+    Export:
+      Name: !Join
+        - '-'
+        - - !Ref 'MainStackName'
+          - RegionalAppDbClusterReaderEndpoint
     Value: !GetAtt 'PrimaryAppCluster.ReadEndpoint.Address'
   RegionalAppDbClusterWriterEndpoint:
     Condition: ''
+    Export:
+      Name: !Join
+        - '-'
+        - - !Ref 'MainStackName'
+          - RegionalAppDbClusterWriterEndpoint
     Value: !GetAtt 'PrimaryAppCluster.Endpoint.Address'
   RegionalAppDbProxyArn:
     Condition: ''
@@ -115,9 +93,19 @@ Outputs:
     Value: !Ref 'PrimaryDemoCluster'
   RegionalDemoDbClusterReaderEndpoint:
     Condition: ''
+    Export:
+      Name: !Join
+        - '-'
+        - - !Ref 'MainStackName'
+          - RegionalDemoDbClusterReaderEndpoint
     Value: !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
   RegionalDemoDbClusterWriterEndpoint:
     Condition: ''
+    Export:
+      Name: !Join
+        - '-'
+        - - !Ref 'MainStackName'
+          - RegionalDemoDbClusterWriterEndpoint
     Value: !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
   RegionalKmsKeyArn:
     Condition: ''
@@ -208,8 +196,6 @@ Parameters:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
     Type: String
-  PrivateHostedZoneId:
-    Type: String
   PublicFqdn:
     Description: >-
       The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS
@@ -252,76 +238,6 @@ Resources:
           - !Ref 'DatabaseAdminPassword'
           - '", "database": "template1"}'
     Type: AWS::SecretsManager::Secret
-  AppDbDnsDeleter:
-    Condition: IsPrimaryRegion
-    Properties:
-      Properties:
-        Fqdns:
-          - '*'
-        HostedZoneId: !Ref 'PrivateHostedZoneId'
-      ServiceToken: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /RegionalDnsRecordDeleterArn}}
-      Type: Custom::DeployLambdaLayer
-      Version: '1.0'
-    Type: AWS::CloudFormation::CustomResource
-  AppDbDnsRecords:
-    Condition: IsPrimaryRegion
-    DeletionPolicy: Retain
-    DependsOn:
-      - AppDbProxy
-    Properties:
-      HostedZoneId: !Ref 'PrivateHostedZoneId'
-      RecordSets:
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - cluster
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryAppCluster.ReadEndpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'AppDbProxyReaderEndpoint.Endpoint'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - cluster
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryAppCluster.Endpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - app
-              - db
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'AppDbProxy.Endpoint'
-          TTL: '1'
-          Type: CNAME
-    Type: AWS::Route53::RecordSetGroup
   AppDbProxy:
     Properties:
       Auth:
@@ -370,7 +286,6 @@ Resources:
             - /DatabaseSubnetZoneBId}}
     Type: AWS::RDS::DBProxyEndpoint
   AppDbProxyTargetGroup:
-    Condition: IsPrimaryRegion
     DependsOn:
       - AppDbProxy
       - PrimaryAppInstance1
@@ -703,75 +618,6 @@ Resources:
           - !Ref 'DatabaseAdminPassword'
           - '", "database": "template1"}'
     Type: AWS::SecretsManager::Secret
-  DemoDbDnsDeleter:
-    Condition: IsPrimaryRegion
-    Properties:
-      Properties:
-        Fqdns:
-          - '*'
-        HostedZoneId: !Ref 'PrivateHostedZoneId'
-      ServiceToken: !Join
-        - ''
-        - - '{{resolve:ssm:/'
-          - !Ref 'MainStackName'
-          - /RegionalDnsRecordDeleterArn}}
-      Type: Custom::DeployLambdaLayer
-      Version: '1.0'
-    Type: AWS::CloudFormation::CustomResource
-  DemoDbDnsRecords:
-    Condition: IsPrimaryRegion
-    DeletionPolicy: Retain
-    DependsOn: []
-    Properties:
-      HostedZoneId: !Ref 'PrivateHostedZoneId'
-      RecordSets:
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - cluster
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - reader
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.ReadEndpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - cluster
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
-          TTL: '1'
-          Type: CNAME
-        - Name: !Join
-            - .
-            - - demo
-              - db
-              - writer
-              - !Ref 'PublicFqdn'
-              - internal
-          ResourceRecords:
-            - !GetAtt 'PrimaryDemoCluster.Endpoint.Address'
-          TTL: '1'
-          Type: CNAME
-    Type: AWS::Route53::RecordSetGroup
   DemoDbSubnetGroup:
     Properties:
       DBSubnetGroupDescription: Demo Database Subnets
@@ -841,52 +687,6 @@ Resources:
       Type: String
       Value: !Ref 'GlobalAppCluster'
     Type: AWS::SSM::Parameter
-  GlobalAppDbReaderDnsEndpointParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Global DNS Endpoint for App DB Reader for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - GlobalAppDbReaderDnsEndpoint
-      Tier: Standard
-      Type: String
-      Value: !Join
-        - ''
-        - - app
-          - .db.reader.
-          - !Ref 'PublicFqdn'
-          - .internal
-    Type: AWS::SSM::Parameter
-  GlobalAppDbWriterDnsEndpointParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Global DNS Endpoint for App DB Writer for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - GlobalAppDbWriterDnsEndpoint
-      Tier: Standard
-      Type: String
-      Value: !Join
-        - ''
-        - - app
-          - .db.writer.
-          - !Ref 'PublicFqdn'
-          - .internal
-    Type: AWS::SSM::Parameter
   GlobalDemoCluster:
     Condition: IsPrimaryRegion
     DependsOn:
@@ -913,52 +713,6 @@ Resources:
       Tier: Standard
       Type: String
       Value: !Ref 'GlobalDemoCluster'
-    Type: AWS::SSM::Parameter
-  GlobalDemoDbReaderDnsEndpointParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Global DNS Endpoint for Demo DB Reader for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - GlobalDemoDbReaderDnsEndpoint
-      Tier: Standard
-      Type: String
-      Value: !Join
-        - ''
-        - - demo
-          - .db.reader.
-          - !Ref 'PublicFqdn'
-          - .internal
-    Type: AWS::SSM::Parameter
-  GlobalDemoDbWriterDnsEndpointParam:
-    Condition: ''
-    Properties:
-      Description: !Join
-        - ''
-        - - 'Global DNS Endpoint for Demo DB Writer for '
-          - !Ref 'AWS::StackName'
-          - ' stack'
-      Name: !Join
-        - ''
-        - - /
-          - !Ref 'MainStackName'
-          - /
-          - GlobalDemoDbWriterDnsEndpoint
-      Tier: Standard
-      Type: String
-      Value: !Join
-        - ''
-        - - demo
-          - .db.writer.
-          - !Ref 'PublicFqdn'
-          - .internal
     Type: AWS::SSM::Parameter
   KMSKey:
     Condition: IsPrimaryRegion

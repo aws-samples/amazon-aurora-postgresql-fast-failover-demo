@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 31, 2024",
-  "Version": "v1.11"
+  "LastUpdated": "September 25, 2024",
+  "Version": "v2.11"
  },
  "Parameters": {
   "CodeDownloadUrl": {
@@ -134,9 +134,6 @@
    "Description": "The CIDR range you wish to use for your VPC.",
    "Type": "String"
   },
-  "PrivateHostedZoneId": {
-   "Type": "String"
-  },
   "PublicFqdn": {
    "Description": "The FQDN to be used by this application (e.g., multi-region-aurora.example.com). An Amazon ACM Certificate will be issued for this FQDN and attached to an Amazon ALB. This FQDN should NOT have a DNS record currently defined in the corresponding Route 53 Hosted Zone.",
    "Type": "String"
@@ -156,38 +153,11 @@
      "x86_64"
     ],
     "Code": {
-     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    '''\n        For each global database endpoint, we'll update it to point to the\n        regional writer endpoint.\n    '''\n    for endpoint_type in ['READER', 'WRITER']:\n        \n        custom_functions.update_dns_record(\n            fqdn            = os.environ['GLOBAL_APP_DB_' + endpoint_type + '_ENDPOINT'],\n            new_value       = os.environ['REGIONAL_APP_DB_CLUSTER_' + endpoint_type + '_ENDPOINT'],\n            hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],\n        )\n        \n    return {\n        'code': 200,\n        'records': json.dumps([])\n    }"
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    '''\n        For each global database endpoint, we'll update it to point to the\n        regional writer endpoint.\n    '''\n    for endpoint_type in ['READER', 'WRITER']:\n        \n        custom_functions.update_dns_record(\n            fqdn            = os.environ['REGIONAL_APP_DB_' + endpoint_type + '_ENDPOINT'],\n            new_value       = os.environ['REGIONAL_APP_DB_CLUSTER_' + endpoint_type + '_ENDPOINT'],\n            hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],\n        )\n        \n    return {\n        'code': 200,\n        'records': json.dumps([])\n    }"
     },
     "Description": "Updates the global database endpoints to bypass the RDS proxy",
     "Environment": {
      "Variables": {
-      "GLOBAL_APP_DB_READER_ENDPOINT": {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:ssm:/",
-         {
-          "Ref": "MainStackName"
-         },
-         "/GlobalAppDbReaderDnsEndpoint}}"
-        ]
-       ]
-      },
-      "GLOBAL_APP_DB_WRITER_ENDPOINT": {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:ssm:/",
-         {
-          "Ref": "MainStackName"
-         },
-         "/GlobalAppDbWriterDnsEndpoint}}"
-        ]
-       ]
-      },
-      "PRIVATE_HOSTED_ZONE_ID": {
-       "Ref": "PrivateHostedZoneId"
-      },
       "REGIONAL_APP_DB_CLUSTER_READER_ENDPOINT": {
        "Fn::Join": [
         "",
@@ -736,33 +706,6 @@
        ]
       },
       "PolicyName": "database-secret-retrieval"
-     },
-     {
-      "PolicyDocument": {
-       "Statement": [
-        {
-         "Action": [
-          "route53:ChangeResourceRecordSets"
-         ],
-         "Effect": "Allow",
-         "Resource": [
-          {
-           "Fn::Join": [
-            "",
-            [
-             "arn:aws:route53:::hostedzone/",
-             {
-              "Ref": "PrivateHostedZoneId"
-             }
-            ]
-           ]
-          }
-         ],
-         "Sid": "UpdateRoute53Records"
-        }
-       ]
-      },
-      "PolicyName": "update-route53-records"
      }
     ]
    },
@@ -777,12 +720,12 @@
      "x86_64"
     ],
     "Code": {
-     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    \n    curs.execute('''\n        SELECT\n            DATE_PART('second', max(insertedon)::time - min(insertedon)::time) AS rto\n        FROM dataclient \n        WHERE http_code = 500 \n        GROUP BY http_code\n    ''');\n    \n    client_events = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n    \n    records_to_return = []\n    \n    for client_event in client_events:\n    \n        c = 0\n        temp2 = {}\n        \n        for col in curs.description:\n            \n            temp2.update({str(col[0]): client_event[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n    \n    return {\n        'code': 200,\n        'body': json.dumps(records_to_return, default = str),\n    }"
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport psycopg2\nimport multi_region_db\n\ncustom_functions = multi_region_db.Functions()\n\ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n\n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n        sslmode = 'require',\n    )\n        \n    curs = db_conn.cursor()\n    \n    curs.execute('''\n        SELECT\n            DATE_PART('second', max(insertedon)::time - min(insertedon)::time) AS rto\n        FROM dataclient \n        WHERE http_code = 500 \n        GROUP BY http_code\n    ''');\n    \n    client_events = curs.fetchall()\n    \n    curs.close()\n    db_conn.close()\n    \n    records_to_return = []\n    \n    for client_event in client_events:\n    \n        c = 0\n        temp2 = {}\n        \n        for col in curs.description:\n            \n            temp2.update({str(col[0]): client_event[c]})\n            c += 1\n        \n        records_to_return.append(temp2)\n    \n    return {\n        'code': 200,\n        'body': json.dumps(records_to_return, default = str),\n    }"
     },
     "Description": "Retrieves the resolved RTO",
     "Environment": {
      "Variables": {
-      "GLOBAL_DEMO_DB_WRITER_ENDPOINT": {
+      "REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT": {
        "Fn::Join": [
         "",
         [
@@ -790,7 +733,7 @@
          {
           "Ref": "MainStackName"
          },
-         "/GlobalDemoDbWriterDnsEndpoint}}"
+         "/RegionalDemoDbClusterWriterEndpoint}}"
         ]
        ]
       },
@@ -1344,23 +1287,11 @@
      "x86_64"
     ],
     "Code": {
-     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef trigger_failover():\n    \n    try:\n        \n        boto3.client('rds').failover_db_cluster(\n            DBClusterIdentifier = os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Initiate Cluster Failover: ' + str(e))\n        \ndef log_failover_event():\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    trigger_failover()\n\n    log_failover_event()\n    \n    return {\n        'code': 200,\n        'body': []\n    }"
+     "ZipFile": "import sys\nsys.path.append('/opt')\n\nimport os\nimport json\nimport boto3\nimport psycopg2\nimport datetime\nimport dateutil.tz\nimport multi_region_db\nfrom botocore.exceptions import ClientError as boto3_client_error\n\ncustom_functions = multi_region_db.Functions()\n\ndef trigger_failover():\n    \n    try:\n        \n        boto3.client('rds').failover_db_cluster(\n            DBClusterIdentifier = os.environ['REGIONAL_APP_DB_CLUSTER_IDENTIFIER']\n        )\n        \n    except boto3_client_error as e:\n        raise Exception('Failed to Initiate Cluster Failover: ' + str(e))\n        \ndef log_failover_event():\n    \n    eastern = dateutil.tz.gettz('US/Eastern')\n    demo_db_credentials = custom_functions.get_db_credentials('Demo')\n    \n    db_conn = psycopg2.connect(\n        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],\n        port = demo_db_credentials['port'],\n        user = demo_db_credentials['username'],\n        sslmode = 'require',\n        password = demo_db_credentials['password'],\n        database = demo_db_credentials['database'],\n        connect_timeout = 3,\n    )\n\n    curs = db_conn.cursor()\n    curs.execute(\"INSERT INTO failoverevents (event, insertedon) values (1,'\" + datetime.datetime.now(tz = eastern).strftime(\"%m/%d/%Y %H:%M:%S\") + \"' )\")\n    db_conn.commit()\n    \n    curs.close()\n    db_conn.close()\n    \ndef handler(event, context):\n    \n    print(json.dumps(event))\n    \n    trigger_failover()\n\n    log_failover_event()\n    \n    return {\n        'code': 200,\n        'body': []\n    }"
     },
     "Description": "Logs failover events",
     "Environment": {
      "Variables": {
-      "GLOBAL_DEMO_DB_WRITER_ENDPOINT": {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:ssm:/",
-         {
-          "Ref": "MainStackName"
-         },
-         "/GlobalDemoDbWriterDnsEndpoint}}"
-        ]
-       ]
-      },
       "REGIONAL_APP_DB_CLUSTER_IDENTIFIER": {
        "Fn::Join": [
         "",
@@ -1370,6 +1301,18 @@
           "Ref": "MainStackName"
          },
          "/RegionalAppDbClusterIdentifier}}"
+        ]
+       ]
+      },
+      "REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:ssm:/",
+         {
+          "Ref": "MainStackName"
+         },
+         "/RegionalDemoDbClusterWriterEndpoint}}"
         ]
        ]
       },

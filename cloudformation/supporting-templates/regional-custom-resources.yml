@@ -13,8 +13,8 @@ Metadata:
   Comments: ''
   CreatedBy: Carter Meyers (AWS)
   Description: This application deploys a Global RDS Aurora cluster.
-  LastUpdated: January 31, 2024
-  Version: v1.11
+  LastUpdated: September 25, 2024
+  Version: v2.11
 Outputs:
   RegionalCfnExportRetrieverArn:
     Condition: ''
@@ -105,8 +105,6 @@ Parameters:
   PrimaryVpcCidr:
     Default: 10.10.0.0/21
     Description: The CIDR range you wish to use for your VPC.
-    Type: String
-  PrivateHostedZoneId:
     Type: String
   PublicFqdn:
     Description: >-
@@ -249,10 +247,6 @@ Resources:
                     - ''
                     - - arn:aws:route53:::hostedzone/
                       - !Ref 'PublicHostedZoneId'
-                  - !Join
-                    - ''
-                    - - arn:aws:route53:::hostedzone/
-                      - !Ref 'PrivateHostedZoneId'
                 Sid: DeleteRoute53Records
           PolicyName: delete-route53-records
     Type: AWS::IAM::Role

@@ -33,8 +33,8 @@
   "Comments": "",
   "CreatedBy": "Carter Meyers (AWS)",
   "Description": "This application deploys a Global RDS Aurora cluster.",
-  "LastUpdated": "January 31, 2024",
-  "Version": "v1.11"
+  "LastUpdated": "September 25, 2024",
+  "Version": "v2.11"
  },
  "Outputs": {
   "GlobalAppDbClusterIdentifier": {
@@ -56,70 +56,6 @@
     "Fn::GetAtt": [
      "PrimaryRegionDbExportRetriever",
      "GlobalAppDbClusterIdentifier"
-    ]
-   }
-  },
-  "GlobalAppDbReaderDnsEndpoint": {
-   "Condition": "",
-   "Value": {
-    "Fn::Join": [
-     "",
-     [
-      "app",
-      ".db.reader.",
-      {
-       "Ref": "PublicFqdn"
-      },
-      ".internal"
-     ]
-    ]
-   }
-  },
-  "GlobalAppDbWriterDnsEndpoint": {
-   "Condition": "",
-   "Value": {
-    "Fn::Join": [
-     "",
-     [
-      "app",
-      ".db.writer.",
-      {
-       "Ref": "PublicFqdn"
-      },
-      ".internal"
-     ]
-    ]
-   }
-  },
-  "GlobalDemoDbReaderDnsEndpoint": {
-   "Condition": "",
-   "Value": {
-    "Fn::Join": [
-     "",
-     [
-      "demo",
-      ".db.reader.",
-      {
-       "Ref": "PublicFqdn"
-      },
-      ".internal"
-     ]
-    ]
-   }
-  },
-  "GlobalDemoDbWriterDnsEndpoint": {
-   "Condition": "",
-   "Value": {
-    "Fn::Join": [
-     "",
-     [
-      "demo",
-      ".db.writer.",
-      {
-       "Ref": "PublicFqdn"
-      },
-      ".internal"
-     ]
     ]
    }
   },
@@ -159,6 +95,19 @@
   },
   "RegionalAppDbClusterReaderEndpoint": {
    "Condition": "",
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "RegionalAppDbClusterReaderEndpoint"
+      ]
+     ]
+    }
+   },
    "Value": {
     "Fn::GetAtt": [
      "FailoverAppCluster",
@@ -168,6 +117,19 @@
   },
   "RegionalAppDbClusterWriterEndpoint": {
    "Condition": "",
+   "Export": {
+    "Name": {
+     "Fn::Join": [
+      "-",
+      [
+       {
+        "Ref": "MainStackName"
+       },
+       "RegionalAppDbClusterWriterEndpoint"
+      ]
+     ]
+    }
+   },
    "Value": {
     "Fn::GetAtt": [
      "FailoverAppCluster",
@@ -265,6 +227,24 @@
        ]
       }
      ]
+    ]
+   }
+  },
+  "RegionalDemoDbClusterReaderEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "PrimaryRegionDbExportRetriever",
+     "RegionalDemoDbClusterReaderEndpoint"
+    ]
+   }
+  },
+  "RegionalDemoDbClusterWriterEndpoint": {
+   "Condition": "",
+   "Value": {
+    "Fn::GetAtt": [
+     "PrimaryRegionDbExportRetriever",
+     "RegionalDemoDbClusterWriterEndpoint"
     ]
    }
   },
@@ -398,9 +378,6 @@
   "PrimaryVpcCidr": {
    "Default": "10.10.0.0/21",
    "Description": "The CIDR range you wish to use for your VPC.",
-   "Type": "String"
-  },
-  "PrivateHostedZoneId": {
    "Type": "String"
   },
   "PublicFqdn": {
@@ -585,7 +562,6 @@
    "Type": "AWS::RDS::DBProxyEndpoint"
   },
   "AppDbProxyTargetGroup": {
-   "Condition": "IsPrimaryRegion",
    "DependsOn": [
     "AppDbProxy",
     "FailoverAppInstance1"
@@ -1226,190 +1202,6 @@
    },
    "Type": "AWS::SSM::Parameter"
   },
-  "GlobalAppDbReaderDnsEndpointParam": {
-   "Condition": "",
-   "Properties": {
-    "Description": {
-     "Fn::Join": [
-      "",
-      [
-       "Global DNS Endpoint for App DB Reader for ",
-       {
-        "Ref": "AWS::StackName"
-       },
-       " stack"
-      ]
-     ]
-    },
-    "Name": {
-     "Fn::Join": [
-      "",
-      [
-       "/",
-       {
-        "Ref": "MainStackName"
-       },
-       "/",
-       "GlobalAppDbReaderDnsEndpoint"
-      ]
-     ]
-    },
-    "Tier": "Standard",
-    "Type": "String",
-    "Value": {
-     "Fn::Join": [
-      "",
-      [
-       "app",
-       ".db.reader.",
-       {
-        "Ref": "PublicFqdn"
-       },
-       ".internal"
-      ]
-     ]
-    }
-   },
-   "Type": "AWS::SSM::Parameter"
-  },
-  "GlobalAppDbWriterDnsEndpointParam": {
-   "Condition": "",
-   "Properties": {
-    "Description": {
-     "Fn::Join": [
-      "",
-      [
-       "Global DNS Endpoint for App DB Writer for ",
-       {
-        "Ref": "AWS::StackName"
-       },
-       " stack"
-      ]
-     ]
-    },
-    "Name": {
-     "Fn::Join": [
-      "",
-      [
-       "/",
-       {
-        "Ref": "MainStackName"
-       },
-       "/",
-       "GlobalAppDbWriterDnsEndpoint"
-      ]
-     ]
-    },
-    "Tier": "Standard",
-    "Type": "String",
-    "Value": {
-     "Fn::Join": [
-      "",
-      [
-       "app",
-       ".db.writer.",
-       {
-        "Ref": "PublicFqdn"
-       },
-       ".internal"
-      ]
-     ]
-    }
-   },
-   "Type": "AWS::SSM::Parameter"
-  },
-  "GlobalDemoDbReaderDnsEndpointParam": {
-   "Condition": "",
-   "Properties": {
-    "Description": {
-     "Fn::Join": [
-      "",
-      [
-       "Global DNS Endpoint for Demo DB Reader for ",
-       {
-        "Ref": "AWS::StackName"
-       },
-       " stack"
-      ]
-     ]
-    },
-    "Name": {
-     "Fn::Join": [
-      "",
-      [
-       "/",
-       {
-        "Ref": "MainStackName"
-       },
-       "/",
-       "GlobalDemoDbReaderDnsEndpoint"
-      ]
-     ]
-    },
-    "Tier": "Standard",
-    "Type": "String",
-    "Value": {
-     "Fn::Join": [
-      "",
-      [
-       "demo",
-       ".db.reader.",
-       {
-        "Ref": "PublicFqdn"
-       },
-       ".internal"
-      ]
-     ]
-    }
-   },
-   "Type": "AWS::SSM::Parameter"
-  },
-  "GlobalDemoDbWriterDnsEndpointParam": {
-   "Condition": "",
-   "Properties": {
-    "Description": {
-     "Fn::Join": [
-      "",
-      [
-       "Global DNS Endpoint for Demo DB Writer for ",
-       {
-        "Ref": "AWS::StackName"
-       },
-       " stack"
-      ]
-     ]
-    },
-    "Name": {
-     "Fn::Join": [
-      "",
-      [
-       "/",
-       {
-        "Ref": "MainStackName"
-       },
-       "/",
-       "GlobalDemoDbWriterDnsEndpoint"
-      ]
-     ]
-    },
-    "Tier": "Standard",
-    "Type": "String",
-    "Value": {
-     "Fn::Join": [
-      "",
-      [
-       "demo",
-       ".db.writer.",
-       {
-        "Ref": "PublicFqdn"
-       },
-       ".internal"
-      ]
-     ]
-    }
-   },
-   "Type": "AWS::SSM::Parameter"
-  },
   "KMSKey": {
    "Condition": "IsPrimaryRegion",
    "Properties": {
@@ -1533,7 +1325,7 @@
      "Region": {
       "Ref": "PrimaryRegionName"
      },
-     "Version": 1.01
+     "Version": 1.04
     },
     "ServiceToken": {
      "Fn::Join": [
@@ -2112,6 +1904,84 @@
         ]
        }
       ]
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalDemoDbClusterReaderEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Demo DB Cluster Reader Endpoint for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalDemoDbClusterReaderEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "PrimaryRegionDbExportRetriever",
+      "RegionalDemoDbClusterReaderEndpoint"
+     ]
+    }
+   },
+   "Type": "AWS::SSM::Parameter"
+  },
+  "RegionalDemoDbClusterWriterEndpointParam": {
+   "Condition": "",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Demo DB Cluster Writer Endpoint for ",
+       {
+        "Ref": "AWS::StackName"
+       },
+       " stack"
+      ]
+     ]
+    },
+    "Name": {
+     "Fn::Join": [
+      "",
+      [
+       "/",
+       {
+        "Ref": "MainStackName"
+       },
+       "/",
+       "RegionalDemoDbClusterWriterEndpoint"
+      ]
+     ]
+    },
+    "Tier": "Standard",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "PrimaryRegionDbExportRetriever",
+      "RegionalDemoDbClusterWriterEndpoint"
      ]
     }
    },
