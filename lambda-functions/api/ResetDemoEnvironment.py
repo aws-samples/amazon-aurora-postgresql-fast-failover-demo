@@ -47,26 +47,6 @@ def point_service_fqdn_to_primary_web_alb():
     
     return True
 
-def point_global_app_db_endpoints_to_primary_proxy():
-    
-    for endpoint_type in ['READER', 'WRITER']:
-        
-        custom_functions.update_dns_record(
-            fqdn            = os.environ['GLOBAL_APP_DB_' + endpoint_type + '_ENDPOINT'],
-            new_value       = os.environ['REGIONAL_APP_DB_PROXY_' + endpoint_type + '_ENDPOINT'],
-            hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],
-        )
-    
-def point_global_app_db_cluster_endpoints_to_primary_cluster():
-    
-    for endpoint_type in ['READER', 'WRITER']:
-        
-        custom_functions.update_dns_record(
-            fqdn            = 'db.cluster.' + endpoint_type + '.' + os.environ['PUBLIC_FQDN'] + '.internal',
-            new_value       = os.environ['REGIONAL_APP_DB_CLUSTER_' + endpoint_type + '_ENDPOINT'],
-            hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],
-        )
-    
 def allow_traffic_to_primary_db_cluster():
     
     ec2_client = boto3.client('ec2')
@@ -90,7 +70,7 @@ def prune_db_tables(db_identifier, table_names):
     db_credentials = custom_functions.get_db_credentials(db_identifier)
     
     db_conn = psycopg2.connect(
-        host = os.environ['GLOBAL_' + db_identifier.upper() + '_DB_WRITER_ENDPOINT'],
+        host = os.environ['REGIONAL_' + db_identifier.upper() + '_DB_CLUSTER_WRITER_ENDPOINT'],
         port = db_credentials['port'],
         user = db_credentials['username'],
         sslmode = 'require',
@@ -110,32 +90,6 @@ def prune_db_tables(db_identifier, table_names):
     
     return True
 
-def disable_proxy_monitor_rule():
-    
-    try:
-        
-        event_bridge_client.disable_rule(
-            Name = os.environ['PROXY_MONITOR_CRON_NAME']
-        )
-    
-    except boto3_client_error as e:
-        raise Exception('Failed to Disable Proxy Monitor Rule: ' + str(e))
-            
-    return True
-    
-def enable_database_canary_rule():
-    
-    try:
-        
-        event_bridge_client.enable_rule(
-            Name = os.environ['DATABASE_CANARY_CRON_NAME']
-        )
-    
-    except boto3_client_error as e:
-        raise Exception('Failed to Enable Database Canary Rule: ' + str(e))
-            
-    return True
-
 '''
     It is expected that this function will be run in the PRIMARY AWS region
 '''
@@ -146,11 +100,7 @@ def handler(event, context):
     prune_db_tables('App', ['dataserver'])
     prune_db_tables('Demo', ['dataclient', 'failoverevents'])
     
-    disable_proxy_monitor_rule()
-    enable_database_canary_rule()
     point_service_fqdn_to_primary_web_alb()
-    point_global_app_db_endpoints_to_primary_proxy()
-    point_global_app_db_cluster_endpoints_to_primary_cluster()
     
     return {
         'code': 200,

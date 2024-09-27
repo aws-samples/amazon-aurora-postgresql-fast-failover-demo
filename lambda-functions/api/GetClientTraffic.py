@@ -18,7 +18,7 @@ def handler(event, context):
     demo_db_credentials = custom_functions.get_db_credentials('Demo')
     
     db_conn = psycopg2.connect(
-        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],
+        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],
         port = demo_db_credentials['port'],
         user = demo_db_credentials['username'],
         sslmode = 'require',

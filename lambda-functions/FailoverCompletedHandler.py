@@ -79,7 +79,7 @@ def handler(event, context):
     demo_db_credentials = custom_functions.get_db_credentials('Demo')
 
     db_conn = psycopg2.connect(
-        host = os.environ['GLOBAL_DEMO_DB_WRITER_ENDPOINT'],
+        host = os.environ['REGIONAL_DEMO_DB_CLUSTER_WRITER_ENDPOINT'],
         port = demo_db_credentials['port'],
         user = demo_db_credentials['username'],
         password = demo_db_credentials['password'],
@@ -98,32 +98,7 @@ def handler(event, context):
         
     elif current_region == os.environ['FAILOVER_REGION_NAME']:
         
-        dns_changes = [
-            {
-                'fqdn': os.environ['GLOBAL_APP_DB_WRITER_ENDPOINT'],
-                'newValue': os.environ['REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT'],
-                'hostedZoneId': os.environ['PRIVATE_HOSTED_ZONE_ID'],
-            },
-            {
-                'fqdn': os.environ['GLOBAL_APP_DB_READER_ENDPOINT'],
-                'newValue': os.environ['REGIONAL_APP_DB_CLUSTER_READER_ENDPOINT'],
-                'hostedZoneId': os.environ['PRIVATE_HOSTED_ZONE_ID'],
-            }
-        ]
-        
-        for dns_change in dns_changes:
-            
-            custom_functions.update_dns_record(
-                fqdn            = dns_change['fqdn'],
-                new_value       = dns_change['newValue'],
-                hosted_zone_id  = dns_change['hostedZoneId'],
-            )
-            
-        enable_proxy_target_waiter_rule()
-        
         point_service_fqdn_to_failover_web_alb()
-        
-        register_failover_cluster_as_proxy_target()
       
     '''
         Logs CNAME Update

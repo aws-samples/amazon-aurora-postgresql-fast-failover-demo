@@ -19,7 +19,7 @@ def handler(event, context):
     for endpoint_type in ['READER', 'WRITER']:
         
         custom_functions.update_dns_record(
-            fqdn            = os.environ['GLOBAL_APP_DB_' + endpoint_type + '_ENDPOINT'],
+            fqdn            = os.environ['REGIONAL_APP_DB_' + endpoint_type + '_ENDPOINT'],
             new_value       = os.environ['REGIONAL_APP_DB_CLUSTER_' + endpoint_type + '_ENDPOINT'],
             hosted_zone_id  = os.environ['PRIVATE_HOSTED_ZONE_ID'],
         )
