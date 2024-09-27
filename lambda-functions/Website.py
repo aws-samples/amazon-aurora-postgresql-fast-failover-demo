@@ -18,40 +18,57 @@ def handler(event, context):
     
     http_status_code = 200
     
-    try: 
+    app_db_credentials = custom_functions.get_db_credentials('App')
+    
+    db_conn = psycopg2.connect(
+        host = os.environ['REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT'],
+        port = app_db_credentials['port'],
+        user = app_db_credentials['username'],
+        password = app_db_credentials['password'],
+        database = app_db_credentials['database'],
+        connect_timeout = 3,
+        sslmode = 'require',
+    )
+    
+    if 'Amazon-Route53-Health-Check-Service' in event['headers']['user-agent']:
         
-        guid = event['queryStringParameters']['guid']
+        try:
+        
+            with db_conn:
+                with db_conn.cursor() as curs:
+                    curs.execute('SELECT NOW()')
+                    results = curs.fetchall()
+                    db_conn.commit()
+                    
+        except Exception as e:
+            http_status_code = 500
+            print(e)
+            print('Failed to Establish DB Connection')
+    
+    else:
+            
+        try: 
+            
+            guid = event['queryStringParameters']['guid']
 
-        eastern = dateutil.tz.gettz('US/Eastern')
+            eastern = dateutil.tz.gettz('US/Eastern')
 
-        sql_statement = "INSERT INTO dataserver (guid, insertedon) VALUES ('" + str(guid) + "','" + datetime.datetime.now(tz = eastern).strftime("%m/%d/%Y %H:%M:%S") + "') RETURNING id"
-        
-        app_db_credentials = custom_functions.get_db_credentials('App')
-        
-        db_conn = psycopg2.connect(
-            host = os.environ['REGIONAL_APP_DB_CLUSTER_WRITER_ENDPOINT'],
-            port = app_db_credentials['port'],
-            user = app_db_credentials['username'],
-            password = app_db_credentials['password'],
-            database = app_db_credentials['database'],
-            connect_timeout = 3,
-            sslmode = 'require',
-        )
-        
-        id = 0
-        http_status_code = 200
-        curs = db_conn.cursor()
-        curs.execute(sql_statement)
-        id = curs.fetchone()[0]
-        print(id)
-        db_conn.commit()
-        curs.close()
-        db_conn.close()
-        
-    except Exception as e:
-        http_status_code = 500
-        print(e)
-        
+            sql_statement = "INSERT INTO dataserver (guid, insertedon) VALUES ('" + str(guid) + "','" + datetime.datetime.now(tz = eastern).strftime("%m/%d/%Y %H:%M:%S") + "') RETURNING id"
+            
+            id = 0
+            http_status_code = 200
+            curs = db_conn.cursor()
+            curs.execute(sql_statement)
+            id = curs.fetchone()[0]
+            print(id)
+            db_conn.commit()
+            curs.close()
+            db_conn.close()
+            
+        except Exception as e:
+            http_status_code = 500
+            print(e)
+            
     return {
         'statusCode': http_status_code,
         'headers': {
