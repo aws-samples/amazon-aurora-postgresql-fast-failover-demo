@@ -1,18 +1,24 @@
 # Amazon Aurora PostgreSQL Fast Failover Demo
 
-## A simple demonstration of in-region (HA) and cross-region (DR) failover automation using Amazon RDS Aurora PostgreSQL Global Database, RDS Proxy and Route53
+Fail over an Aurora PostgreSQL writer in under a minute, in-region and cross-region, with RDS Proxy holding client connections and Route 53 moving traffic. This repository deploys a complete, self-contained demo — a two-region Aurora PostgreSQL Global Database, RDS Proxy, Route 53, a load-generating test application, and dashboards that chart successful requests against errors — so you can trigger a failure and watch recovery happen.
+
+The failover times you observe reflect what Aurora provides out of the box. For in-region failover, Aurora promotes a reader to writer and service is typically restored in [less than 60 seconds, and often less than 30 seconds](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.AuroraHighAvailability.html). For cross-region recovery with an Aurora Global Database, unplanned [failover](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html) has a recovery time objective (RTO) on the order of minutes with a recovery point objective (RPO) measured in seconds, while a planned [switchover](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html) completes with zero data loss and, on qualifying engine versions, read/write recovery typically under 30 seconds.
+
+> Demonstrates in-region (HA) and cross-region (DR) failover automation using Amazon Aurora PostgreSQL Global Database, RDS Proxy, and Route 53.
+
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Faws-samples%2Famazon-aurora-postgresql-fast-failover-demo&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
 
 ## Cross-Region Recovery
-- The CloudFormation template sets up a two-region database cluster for Diaster Recoveryand statically stable application routing to the local databse cluster.
-- A Lambda canary process continually stans the primary region (every 10 seconds) from the secondary region, and enacts failover if it observes 30 seconds of consecutive failures.
+- The CloudFormation template sets up a two-region database cluster for Disaster Recovery and statically stable application routing to the local database cluster.
+- A Lambda canary process continually scans the primary region (every 10 seconds) from the secondary region, and enacts failover if it observes 30 seconds of consecutive failures.
  
 ![architecture for cross-region failover](architecture_multi_region.png)
 
 ## In-Region Recovery
-- Each region also contains an RDS Proxy to provide High Availability transparent failover to the failved-over writer in the secondary Availability Zone.
+- Each region also contains an RDS Proxy to provide High Availability transparent failover to the failed-over writer in the secondary Availability Zone.
 - By queueing read and write queries until the reader instance comes back as a writer, RDS Proxy turns what would be SQL errors into a few extra seconds of latency for the application.
 
-![architecture for cross-region failover](architecture_multi_region.png)
+![architecture for in-region failover](architecture_in_region.png)
 
 ## Demos
 - The repository also contains a test application to produce load for the application and log successful calls and errors in a simple UI, and times the failover
@@ -29,8 +35,8 @@
 - Ensure that your Lambda concurrency is increased to at least 1000 in both test regions. In the AWS Console, navigate to: Service Quotas -> AWS services -> AWS Lambda -> Concurrent executions and click Request quota increase, selecting 1000. Do this in each test region.
 - Optionally, you can specify the [CIDR blocks](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) (e.g. 10.10.0.0/21) for 2 VPCs and their subnets the solution will create
 	- The template creates one VPC in the primary region and one in the secondary region
-	- Each of the 2 VPCs the template will create will containin:
-		- 2 public subnets (for the Internet-facing API we'll be calling to test the region's applicaion)
+	- Each of the 2 VPCs the template will create will contain:
+		- 2 public subnets (for the Internet-facing API we'll be calling to test the region's application)
 		- 2 private subnets (for the application's middle tier lambda)
 		- 2 more private subnets (for the database instances the middle tier will write to)
 
@@ -62,15 +68,15 @@
 		- ![in-region control panel](control_in_region.png)
 		- 1: Bypass (or enable) RDS Proxy to see the difference in data loss with and without it
 		- 2: Click "Generate Client Traffic" to begin the test.
-		- Note the blue line whihc measures successful requests
-		- 3: Click "Send Failover Resuest" to shut down the active Aurora writer instance, causing an outage until the Aurora reader instance in the secondary availability zone restarts as a writer. 
+		- Note the blue line which measures successful requests
+		- 3: Click "Send Failover Request" to shut down the active Aurora writer instance, causing an outage until the Aurora reader instance in the secondary availability zone restarts as a writer. 
 		- Note the red line that measures errors returned to the client and the outage duration with and without RDS Proxy
 		- 4: Reset the test environment before switching RDS Proxy on or off or re-running the test.
 - Test in-region failover using Amazon Aurora Global Database:
 	- Navigate to https://dashboard.<your Public Service FQDN>/in-region-failover.html
 		- ![cross-region control panel](control_cross_region.png)
 		- 1: Click "Generate Client Traffic" to begin the test.
-		- Note the blue line whihc measures successful requests
+		- Note the blue line which measures successful requests
 		- 2: Click "Simulate LSE" to shut down all network connectivity to the primary region's Aurora databases causing an outage of the whole region's test applications in this VPC.
 		- Note the red line that measures errors returned to the client and the outage duration.
 		- Wait until the Canary Lambda notices the region is unhealthy, the Aurora reader instance in the secondary region restarts as a writer, and the Route53 CNAME is redirected to the secondary region.
@@ -79,7 +85,7 @@
 ## Cleaning Up This Solution
 - To clean up / undeploy this solution, simply delete the primary CloudFormation Stack you initially launched. The cleanup will take roughly 45 minutes.
 - If you see a delete failure, retry it, without skipping any failed deletions.
-- Sometimes ENIs take longer than expexted to delete, in which case you can delete them and the VPC manually, then retry the stack deletion.
+- Sometimes ENIs take longer than expected to delete, in which case you can delete them and the VPC manually, then retry the stack deletion.
 - After the stack deletion is complete, you need to delete the IAM roles used to do the deletion. Navigate to IAM -> Roles and find the roles that have your stack name as the prefix
 
 ## Security
@@ -91,7 +97,3 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 This library is licensed under the MIT-0 License. See the LICENSE file.
 
 Note that the Python code depends on, but does not include, the LGPL-3.0 licensed Psycopg PostgreSQL adapter.
-
-## Page Counter
-
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Faws-samples%2Famazon-aurora-postgresql-fast-failover-demo&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
